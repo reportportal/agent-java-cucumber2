@@ -18,15 +18,15 @@ repositories {
 }
 
 dependencies {
-    compile('com.epam.reportportal:client-java:4.0.0-BETA-1') {
+    compile('com.epam.reportportal:client-java:4.0.4') {
         ext.compileScope = true
     }
-    compile('com.epam.reportportal:commons-model:4.0.0') {
+    compile('com.epam.reportportal:commons-model:4.0.3') {
         ext.compileScope = true
     }
 
 
-    compile group: 'io.cucumber', name: 'cucumber-java', version: '2.3.1'
+    compile group: 'io.cucumber', name: 'cucumber-java', version: '2.4.0'
 }
 
 task wrapper(type: Wrapper) {
