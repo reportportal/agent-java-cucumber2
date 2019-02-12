@@ -1,5 +1,6 @@
 package com.epam.reportportal.cucumber;
 
+import com.epam.ta.reportportal.ws.model.ItemAttributeResource;
 import cucumber.api.TestCase;
 import cucumber.api.TestStep;
 import cucumber.api.event.TestSourceRead;
@@ -7,24 +8,11 @@ import gherkin.AstBuilder;
 import gherkin.Parser;
 import gherkin.ParserException;
 import gherkin.TokenMatcher;
-import gherkin.ast.Background;
-import gherkin.ast.Examples;
-import gherkin.ast.Feature;
-import gherkin.ast.GherkinDocument;
-import gherkin.ast.ScenarioDefinition;
-import gherkin.ast.ScenarioOutline;
-import gherkin.ast.Step;
-import gherkin.ast.TableRow;
+import gherkin.ast.*;
 import gherkin.pickles.PickleTag;
 import io.reactivex.Maybe;
 
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 
 import static com.epam.reportportal.cucumber.Utils.extractPickleTags;
 import static com.epam.reportportal.cucumber.Utils.extractTags;
@@ -43,12 +31,12 @@ public class RunningContext {
         private static Map<String, TestSourceRead> pathToReadEventMap = new HashMap<String, TestSourceRead>();
 
         private String currentFeatureUri;
-        private Maybe<String> currentFeatureId;
+        private Maybe<Long> currentFeatureId;
         private Feature currentFeature;
-        private Set<String> tags;
+        private Set<ItemAttributeResource> tags;
 
         FeatureContext() {
-            tags = new HashSet<String>();
+            tags = new HashSet<ItemAttributeResource>();
         }
 
         static void addTestSourceReadEvent(String path, TestSourceRead event) {
@@ -101,7 +89,7 @@ public class RunningContext {
             return currentFeature;
         }
 
-        Set<String> getTags() {
+        Set<ItemAttributeResource> getTags() {
             return tags;
         }
 
@@ -109,11 +97,11 @@ public class RunningContext {
             return currentFeatureUri;
         }
 
-        Maybe<String> getFeatureId() {
+        Maybe<Long> getFeatureId() {
             return currentFeatureId;
         }
 
-        void setFeatureId(Maybe<String> featureId) {
+        void setFeatureId(Maybe<Long> featureId) {
             this.currentFeatureId = featureId;
         }
 
@@ -146,19 +134,19 @@ public class RunningContext {
 
         private static Map<Integer, ArrayDeque<String>> outlineIterationsMap = new HashMap<Integer, ArrayDeque<String>>();
 
-        private Maybe<String> id = null;
+        private Maybe<Long> id = null;
         private Background background;
         private ScenarioDefinition scenario;
         private Queue<Step> backgroundSteps;
         private Map<Integer, Step> scenarioLocationMap;
-        private Set<String> tags;
+        private Set<ItemAttributeResource> tags;
         private TestCase testCase;
         private boolean hasBackground = false;
 
         ScenarioContext() {
             backgroundSteps = new ArrayDeque<Step>();
             scenarioLocationMap = new HashMap<Integer, Step>();
-            tags = new HashSet<String>();
+            tags = new HashSet<ItemAttributeResource>();
         }
 
         ScenarioContext processScenario(ScenarioDefinition scenario) {
@@ -218,7 +206,7 @@ public class RunningContext {
             return scenario.getLocation().getLine();
         }
 
-        Set<String> getTags() {
+        Set<ItemAttributeResource> getTags() {
             return tags;
         }
 
@@ -238,11 +226,11 @@ public class RunningContext {
             throw new IllegalStateException(String.format("Trying to get step for unknown line in feature. Scenario: %s, line: %s", scenario.getName(), getLine()));
         }
 
-        Maybe<String> getId() {
+        Maybe<Long> getId() {
             return id;
         }
 
-        void setId(Maybe<String> newId) {
+        void setId(Maybe<Long> newId) {
             if (id != null) {
                 throw new IllegalStateException("Attempting re-set scenario ID for unfinished scenario.");
             }
