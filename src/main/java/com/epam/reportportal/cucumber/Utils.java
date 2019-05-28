@@ -24,8 +24,8 @@ import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
-import com.epam.ta.reportportal.ws.model.ItemAttributeResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
+import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.TestStep;
@@ -56,11 +56,11 @@ public class Utils {
 
 	}
 
-	public static void finishTestItem(Launch rp, Maybe<Long> itemId) {
+	public static void finishTestItem(Launch rp, Maybe<String> itemId) {
 		finishTestItem(rp, itemId, null);
 	}
 
-	public static void finishTestItem(Launch rp, Maybe<Long> itemId, String status) {
+	public static void finishTestItem(Launch rp, Maybe<String> itemId, String status) {
 		if (itemId == null) {
 			LOGGER.error("BUG: Trying to finish unspecified test item.");
 			return;
@@ -74,12 +74,12 @@ public class Utils {
 
 	}
 
-	public static Maybe<Long> startNonLeafNode(Launch rp, Maybe<Long> rootItemId, String name, String description,
-			Set<ItemAttributeResource> tags, String type) {
+	public static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description,
+			Set<ItemAttributesRQ> attributes, String type) {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		rq.setDescription(description);
 		rq.setName(name);
-		rq.setAttributes(tags);
+		rq.setAttributes(attributes);
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(type);
 
@@ -87,9 +87,9 @@ public class Utils {
 	}
 
 	public static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog(new Function<Long, SaveLogRQ>() {
+		ReportPortal.emitLog(new Function<String, SaveLogRQ>() {
 			@Override
-			public SaveLogRQ apply(Long item) {
+			public SaveLogRQ apply(String item) {
 				SaveLogRQ rq = new SaveLogRQ();
 				rq.setMessage(message);
 				rq.setTestItemId(item);
@@ -107,28 +107,28 @@ public class Utils {
 	 * Transform tags from Cucumber to RP format
 	 *
 	 * @param tags - Cucumber tags
-	 * @return set of tags
+	 * @return set of attributes
 	 */
-	public static Set<ItemAttributeResource> extractPickleTags(List<PickleTag> tags) {
-		Set<ItemAttributeResource> returnTags = new HashSet<ItemAttributeResource>();
+	public static Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
+		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
 		for (PickleTag tag : tags) {
-			returnTags.add(new ItemAttributeResource(null, tag.getName()));
+			attributes.add(new ItemAttributesRQ(null, tag.getName()));
 		}
-		return returnTags;
+		return attributes;
 	}
 
 	/**
 	 * Transform tags from Cucumber to RP format
 	 *
 	 * @param tags - Cucumber tags
-	 * @return set of tags
+	 * @return set of attributes
 	 */
-	public static Set<ItemAttributeResource> extractTags(List<Tag> tags) {
-		Set<ItemAttributeResource> returnTags = new HashSet<ItemAttributeResource>();
+	public static Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
+		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
 		for (Tag tag : tags) {
-			returnTags.add(new ItemAttributeResource(null, tag.getName()));
+			attributes.add(new ItemAttributesRQ(null, tag.getName()));
 		}
-		return returnTags;
+		return attributes;
 	}
 
 	/**

@@ -49,71 +49,70 @@ import java.util.Calendar;
  * @author Serhii Zharskyi
  */
 public class StepReporter extends AbstractReporter {
-    protected Maybe<Long> currentStepId;
-    protected Maybe<Long> hookStepId;
-    protected String hookStatus;
+	protected Maybe<String> currentStepId;
+	protected Maybe<String> hookStepId;
+	protected String hookStatus;
 
-    public StepReporter() {
-        super();
-        currentStepId = null;
-        hookStepId = null;
-        hookStatus = null;
-    }
+	public StepReporter() {
+		super();
+		currentStepId = null;
+		hookStepId = null;
+		hookStatus = null;
+	}
 
+	@Override
+	protected Maybe<String> getRootItemId() {
+		return null;
+	}
 
-    @Override
-    protected Maybe<Long> getRootItemId() {
-        return null;
-    }
+	@Override
+	protected void beforeStep(TestStep testStep) {
+		Step step = currentScenarioContext.getStep(testStep);
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setName(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), testStep.getStepText(), " "));
+		rq.setDescription(Utils.buildMultilineArgument(testStep));
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType("STEP");
+		currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
+	}
 
-    @Override
-    protected void beforeStep(TestStep testStep) {
-        Step step = currentScenarioContext.getStep(testStep);
-        StartTestItemRQ rq = new StartTestItemRQ();
-        rq.setName(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), testStep.getStepText(), " "));
-        rq.setDescription(Utils.buildMultilineArgument(testStep));
-        rq.setStartTime(Calendar.getInstance().getTime());
-        rq.setType("STEP");
-        currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
-    }
+	@Override
+	protected void afterStep(Result result) {
+		reportResult(result, null);
+		Utils.finishTestItem(RP.get(), currentStepId, result.getStatus().toString().toUpperCase());
+		currentStepId = null;
+	}
 
-    @Override
-    protected void afterStep(Result result) {
-        reportResult(result, null);
-        Utils.finishTestItem(RP.get(), currentStepId, result.getStatus().toString().toUpperCase());
-        currentStepId = null;
-    }
+	@Override
+	protected void beforeHooks(Boolean isBefore) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setName(isBefore ? "Before hooks" : "After hooks");
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType(isBefore ? "BEFORE_TEST" : "AFTER_TEST");
 
-    @Override
-    protected void beforeHooks(Boolean isBefore) {
-        StartTestItemRQ rq = new StartTestItemRQ();
-        rq.setName(isBefore ? "Before hooks" : "After hooks");
-        rq.setStartTime(Calendar.getInstance().getTime());
-        rq.setType(isBefore ? "BEFORE_TEST" : "AFTER_TEST");
+		hookStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
+		hookStatus = Statuses.PASSED;
+	}
 
-        hookStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
-        hookStatus = Statuses.PASSED;
-    }
+	@Override
+	protected void afterHooks(Boolean isBefore) {
+		Utils.finishTestItem(RP.get(), hookStepId, hookStatus);
+		hookStepId = null;
+	}
 
-    @Override
-    protected void afterHooks(Boolean isBefore) {
-        Utils.finishTestItem(RP.get(), hookStepId, hookStatus);
-        hookStepId = null;
-    }
+	@Override
+	protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
+		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
+		hookStatus = result.getStatus().toString();
+	}
 
-    @Override
-    protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
-        reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
-        hookStatus = result.getStatus().toString();
-    }
+	@Override
+	protected String getFeatureTestItemType() {
+		return "SUITE";
+	}
 
-    @Override
-    protected String getFeatureTestItemType() {
-        return "SUITE";
-    }
-
-    @Override
-    protected String getScenarioTestItemType() {
-        return "SCENARIO";
-    }
+	@Override
+	protected String getScenarioTestItemType() {
+		return "SCENARIO";
+	}
 }

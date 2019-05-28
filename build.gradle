@@ -18,19 +18,18 @@ repositories {
 }
 
 dependencies {
-    compile('com.github.reportportal:client-java:138bbc2') {
+    compile('com.github.reportportal:client-java:ecd9415') {
         ext.compileScope = true
     }
-    compile('com.github.reportportal:commons-model:63ef134') {
+    compile('com.github.reportportal:commons-model:d157752') {
         ext.compileScope = true
     }
-
-
+    
     compile group: 'io.cucumber', name: 'cucumber-java', version: '2.4.0'
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '3.5'
+    gradleVersion = '4.7'
 }
 
 publishing.publications.all {
