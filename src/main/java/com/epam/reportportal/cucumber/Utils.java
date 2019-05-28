@@ -77,8 +77,8 @@ public class Utils {
 	public static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description,
 			Set<ItemAttributesRQ> attributes, String type) {
 		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setDescription(description);
 		rq.setName(name);
+		rq.setDescription(description);
 		rq.setAttributes(attributes);
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(type);
