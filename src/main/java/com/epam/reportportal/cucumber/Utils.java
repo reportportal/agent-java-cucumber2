@@ -92,7 +92,7 @@ public class Utils {
 			public SaveLogRQ apply(String item) {
 				SaveLogRQ rq = new SaveLogRQ();
 				rq.setMessage(message);
-				rq.setTestItemId(item);
+				rq.setItemId(item);
 				rq.setLevel(level);
 				rq.setLogTime(Calendar.getInstance().getTime());
 				if (file != null) {
