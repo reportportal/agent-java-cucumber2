@@ -24,14 +24,9 @@ import com.epam.reportportal.listeners.Statuses;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
-import cucumber.runtime.StepDefinitionMatch;
 import gherkin.ast.Step;
 import io.reactivex.Maybe;
-import io.reactivex.annotations.Nullable;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Calendar;
 
 /**
