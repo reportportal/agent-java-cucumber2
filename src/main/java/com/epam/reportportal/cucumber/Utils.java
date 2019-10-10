@@ -261,7 +261,7 @@ public class Utils {
 				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
 				return testCaseIdAnnotation != null ?
 						testCaseIdAnnotation.value() :
-						getTestCaseId(codeRef, stepDefinitionMatch.getArguments());
+						getTestCaseId(codeRef, testStep.getDefinitionArgument());
 			} catch (NoSuchFieldException e) {
 				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
 			} catch (IllegalAccessException e) {
