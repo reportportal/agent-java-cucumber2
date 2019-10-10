@@ -20,6 +20,7 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.reportportal.annotations.TestCaseId;
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
@@ -52,6 +53,7 @@ public class Utils {
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
+	private static final String METHOD_FIELD_NAME = "method";
 
 	//@formatter:off
 	private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
@@ -243,6 +245,39 @@ public class Utils {
 			return null;
 		}
 
+	}
+
+	public static int getTestCaseId(TestStep testStep, String codeRef) {
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+		if (definitionMatchField != null) {
+			try {
+				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
+				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
+				stepDefinitionField.setAccessible(true);
+				Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
+				Field methodField = javaStepDefinition.getClass().getDeclaredField(METHOD_FIELD_NAME);
+				methodField.setAccessible(true);
+				Method method = (Method) methodField.get(javaStepDefinition);
+				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
+				return testCaseIdAnnotation != null ?
+						testCaseIdAnnotation.value() :
+						getTestCaseId(codeRef, stepDefinitionMatch.getArguments());
+			} catch (NoSuchFieldException e) {
+				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
+			} catch (IllegalAccessException e) {
+				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
+			}
+		} else {
+			return getTestCaseId(codeRef, testStep.getDefinitionArgument());
+		}
+	}
+
+	private static int getTestCaseId(String codeRef, List<cucumber.runtime.Argument> arguments) {
+		List<String> values = new ArrayList<String>(arguments.size());
+		for (cucumber.runtime.Argument argument : arguments) {
+			values.add(argument.getVal());
+		}
+		return Arrays.deepHashCode(new Object[] { codeRef, values });
 	}
 
 	@Nullable

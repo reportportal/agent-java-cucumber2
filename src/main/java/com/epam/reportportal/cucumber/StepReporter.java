@@ -74,7 +74,9 @@ public class StepReporter extends AbstractReporter {
 		rq.setDescription(Utils.buildMultilineArgument(testStep));
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType("STEP");
-		rq.setCodeRef(Utils.getCodeRef(testStep));
+		String codeRef = Utils.getCodeRef(testStep);
+		rq.setCodeRef(codeRef);
+		rq.setTestCaseId(Utils.getTestCaseId(testStep, codeRef));
 		currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
 	}
 
