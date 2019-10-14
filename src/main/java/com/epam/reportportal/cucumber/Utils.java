@@ -260,7 +260,7 @@ public class Utils {
 				Method method = (Method) methodField.get(javaStepDefinition);
 				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
 				return testCaseIdAnnotation != null ?
-						testCaseIdAnnotation.value() :
+						getTestCaseId(testCaseIdAnnotation, testStep.getDefinitionArgument()) :
 						getTestCaseId(codeRef, testStep.getDefinitionArgument());
 			} catch (NoSuchFieldException e) {
 				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
@@ -269,6 +269,18 @@ public class Utils {
 			}
 		} else {
 			return getTestCaseId(codeRef, testStep.getDefinitionArgument());
+		}
+	}
+
+	private static int getTestCaseId(TestCaseId testCaseId, List<cucumber.runtime.Argument> arguments) {
+		if (testCaseId.isParameterized()) {
+			List<String> values = new ArrayList<String>(arguments.size());
+			for (cucumber.runtime.Argument argument : arguments) {
+				values.add(argument.getVal());
+			}
+			return Arrays.deepHashCode(new Object[] { testCaseId.value(), values });
+		} else {
+			return testCaseId.value();
 		}
 	}
 
