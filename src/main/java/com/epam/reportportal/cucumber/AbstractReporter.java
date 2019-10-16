@@ -45,6 +45,8 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashSet;
 
+import static rp.com.google.common.base.Strings.isNullOrEmpty;
+
 /**
  * Abstract Cucumber 2.x formatter for Report Portal
  *
@@ -197,6 +199,10 @@ public abstract class AbstractReporter implements Formatter {
 				rq.setMode(parameters.getLaunchRunningMode());
 				rq.setAttributes(parameters.getAttributes() == null ? new HashSet<ItemAttributesRQ>() : parameters.getAttributes());
 				rq.setDescription(parameters.getDescription());
+				rq.setRerun(parameters.isRerun());
+				if (!isNullOrEmpty(parameters.getRerunOf())) {
+					rq.setRerunOf(parameters.getRerunOf());
+				}
 
 				Boolean skippedAnIssue = parameters.getSkippedAnIssue();
 				ItemAttributesRQ skippedIssueAttr = new ItemAttributesRQ();
