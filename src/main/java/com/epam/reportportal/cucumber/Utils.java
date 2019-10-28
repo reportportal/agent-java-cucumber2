@@ -248,7 +248,8 @@ public class Utils {
 
 	}
 
-	public static int getTestCaseId(TestStep testStep, String codeRef) {
+	@Nullable
+	public static Integer getTestCaseId(TestStep testStep, String codeRef) {
 		Field definitionMatchField = getDefinitionMatchField(testStep);
 		if (definitionMatchField != null) {
 			try {
@@ -273,13 +274,14 @@ public class Utils {
 		}
 	}
 
+	@Nullable
 	private static int getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.runtime.Argument> arguments) {
 		if (testCaseId.isParameterized()) {
 			List<String> values = new ArrayList<String>(arguments.size());
 			for (cucumber.runtime.Argument argument : arguments) {
 				values.add(argument.getVal());
 			}
-			return TestCaseIdUtils.getTestCaseId(testCaseId, method, values.toArray());
+			return TestCaseIdUtils.getParameterizedTestCaseId(method, values.toArray());
 		} else {
 			return testCaseId.value();
 		}
