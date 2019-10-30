@@ -132,15 +132,15 @@ public abstract class AbstractReporter implements Formatter {
 	 * Start Cucumber scenario
 	 */
 	protected void beforeScenario() {
-		Maybe<String> id = Utils.startNonLeafNode(
-				RP.get(),
+		Maybe<String> id = Utils.startNonLeafNode(RP.get(),
 				currentFeatureContext.getFeatureId(),
 				Utils.buildNodeName(currentScenarioContext.getKeyword(),
 						AbstractReporter.COLON_INFIX,
 						currentScenarioContext.getName(),
 						currentScenarioContext.getOutlineIteration()
 				),
-				currentFeatureContext.getUri() + ":" + currentScenarioContext.getLine(), currentScenarioContext.getAttributes(),
+				currentFeatureContext.getUri() + ":" + currentScenarioContext.getLine(),
+				currentScenarioContext.getAttributes(),
 				getScenarioTestItemType()
 		);
 		currentScenarioContext.setId(id);
@@ -161,8 +161,7 @@ public abstract class AbstractReporter implements Formatter {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		Maybe<String> root = getRootItemId();
 		rq.setDescription(currentFeatureContext.getUri());
-		rq.setName(Utils.buildNodeName(
-				currentFeatureContext.getFeature().getKeyword(),
+		rq.setName(Utils.buildNodeName(currentFeatureContext.getFeature().getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				currentFeatureContext.getFeature().getName(),
 				null
