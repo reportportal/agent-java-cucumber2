@@ -20,9 +20,11 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.reportportal.annotations.TestCaseId;
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
+import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
@@ -52,6 +54,7 @@ public class Utils {
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
+	private static final String METHOD_FIELD_NAME = "method";
 
 	//@formatter:off
 	private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
@@ -243,6 +246,53 @@ public class Utils {
 			return null;
 		}
 
+	}
+
+	@Nullable
+	public static Integer getTestCaseId(TestStep testStep, String codeRef) {
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+		if (definitionMatchField != null) {
+			try {
+				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
+				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
+				stepDefinitionField.setAccessible(true);
+				Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
+				Field methodField = javaStepDefinition.getClass().getDeclaredField(METHOD_FIELD_NAME);
+				methodField.setAccessible(true);
+				Method method = (Method) methodField.get(javaStepDefinition);
+				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
+				return testCaseIdAnnotation != null ?
+						getTestCaseId(testCaseIdAnnotation, method, testStep.getDefinitionArgument()) :
+						getTestCaseId(codeRef, testStep.getDefinitionArgument());
+			} catch (NoSuchFieldException e) {
+				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
+			} catch (IllegalAccessException e) {
+				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
+			}
+		} else {
+			return getTestCaseId(codeRef, testStep.getDefinitionArgument());
+		}
+	}
+
+	@Nullable
+	private static int getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.runtime.Argument> arguments) {
+		if (testCaseId.isParameterized()) {
+			List<String> values = new ArrayList<String>(arguments.size());
+			for (cucumber.runtime.Argument argument : arguments) {
+				values.add(argument.getVal());
+			}
+			return TestCaseIdUtils.getParameterizedTestCaseId(method, values.toArray());
+		} else {
+			return testCaseId.value();
+		}
+	}
+
+	private static int getTestCaseId(String codeRef, List<cucumber.runtime.Argument> arguments) {
+		List<String> values = new ArrayList<String>(arguments.size());
+		for (cucumber.runtime.Argument argument : arguments) {
+			values.add(argument.getVal());
+		}
+		return Arrays.deepHashCode(new Object[] { codeRef, values.toArray() });
 	}
 
 	@Nullable
