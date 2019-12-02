@@ -25,6 +25,7 @@ import com.epam.reportportal.annotations.attribute.Attributes;
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
+import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.utils.AttributeParser;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
@@ -38,6 +39,7 @@ import gherkin.ast.Tag;
 import gherkin.pickles.*;
 import io.reactivex.Maybe;
 import io.reactivex.annotations.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Function;
@@ -270,7 +272,7 @@ public class Utils {
 	}
 
 	@Nullable
-	public static Integer getTestCaseId(TestStep testStep, String codeRef) {
+	public static TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
 		Field definitionMatchField = getDefinitionMatchField(testStep);
 		if (definitionMatchField != null) {
 			try {
@@ -301,7 +303,7 @@ public class Utils {
 	}
 
 	@Nullable
-	private static int getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.runtime.Argument> arguments) {
+	private static TestCaseIdEntry getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.runtime.Argument> arguments) {
 		if (testCaseId.parametrized()) {
 			List<String> values = new ArrayList<String>(arguments.size());
 			for (cucumber.runtime.Argument argument : arguments) {
@@ -309,16 +311,17 @@ public class Utils {
 			}
 			return TestCaseIdUtils.getParameterizedTestCaseId(method, values.toArray());
 		} else {
-			return testCaseId.value();
+			return new TestCaseIdEntry(testCaseId.value(), testCaseId.value().hashCode());
 		}
 	}
 
-	private static int getTestCaseId(String codeRef, List<cucumber.runtime.Argument> arguments) {
+	private static TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.runtime.Argument> arguments) {
 		List<String> values = new ArrayList<String>(arguments.size());
 		for (cucumber.runtime.Argument argument : arguments) {
 			values.add(argument.getVal());
 		}
-		return Arrays.deepHashCode(new Object[] { codeRef, values.toArray() });
+		return new TestCaseIdEntry(StringUtils.join(codeRef, values.toArray()),
+				Arrays.deepHashCode(new Object[] { codeRef, values.toArray() }));
 	}
 
 	@Nullable
