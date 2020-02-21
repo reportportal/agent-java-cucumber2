@@ -23,6 +23,7 @@ package com.epam.reportportal.cucumber;
 import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
+import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
@@ -57,6 +58,8 @@ import static rp.com.google.common.base.Strings.isNullOrEmpty;
 public abstract class AbstractReporter implements Formatter {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
+
+	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
 
 	protected static final String COLON_INFIX = ": ";
 
@@ -104,6 +107,15 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	protected void beforeLaunch() {
 		startLaunch();
+	}
+
+	/**
+	 * Extension point to customize ReportPortal instance
+	 *
+	 * @return ReportPortal
+	 */
+	protected ReportPortal buildReportPortal() {
+		return ReportPortal.builder().build();
 	}
 
 	/**
@@ -189,7 +201,7 @@ public abstract class AbstractReporter implements Formatter {
 
 			@Override
 			public Launch get() {
-				final ReportPortal reportPortal = ReportPortal.builder().build();
+				final ReportPortal reportPortal = buildReportPortal();
 				ListenerParameters parameters = reportPortal.getParameters();
 
 				StartLaunchRQ rq = new StartLaunchRQ();
@@ -197,6 +209,7 @@ public abstract class AbstractReporter implements Formatter {
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
 				rq.setAttributes(parameters.getAttributes() == null ? new HashSet<ItemAttributesRQ>() : parameters.getAttributes());
+				rq.getAttributes().addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
 				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
 				if (!isNullOrEmpty(parameters.getRerunOf())) {
