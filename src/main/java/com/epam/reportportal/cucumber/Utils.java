@@ -29,6 +29,7 @@ import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.utils.AttributeParser;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
+import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
@@ -44,11 +45,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
+import rp.com.google.common.collect.Lists;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class Utils {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
@@ -59,6 +64,7 @@ public class Utils {
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
 	private static final String METHOD_FIELD_NAME = "method";
+	private static final String PARAMETER_REGEX = "<[^<>]+>";
 
 	//@formatter:off
 	private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
@@ -230,9 +236,7 @@ public class Utils {
 				if (attributesAnnotation != null) {
 					return AttributeParser.retrieveAttributes(attributesAnnotation);
 				}
-			} catch (NoSuchFieldException e) {
-				return null;
-			} catch (IllegalAccessException e) {
+			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return null;
 			}
 		}
@@ -255,20 +259,13 @@ public class Utils {
 				getLocationMethod.setAccessible(true);
 				String fullCodeRef = String.valueOf(getLocationMethod.invoke(javaStepDefinition, true));
 				return fullCodeRef != null ? fullCodeRef.substring(0, fullCodeRef.indexOf(METHOD_OPENING_BRACKET)) : null;
-			} catch (NoSuchFieldException e) {
-				return null;
-			} catch (NoSuchMethodException e) {
-				return null;
-			} catch (IllegalAccessException e) {
-				return null;
-			} catch (InvocationTargetException e) {
+			} catch (NoSuchFieldException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
 				return null;
 			}
 
 		} else {
 			return null;
 		}
-
 	}
 
 	@Nullable
@@ -281,14 +278,31 @@ public class Utils {
 				return testCaseIdAnnotation != null ?
 						getTestCaseId(testCaseIdAnnotation, method, testStep.getDefinitionArgument()) :
 						getTestCaseId(codeRef, testStep.getDefinitionArgument());
-			} catch (NoSuchFieldException e) {
-				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
-			} catch (IllegalAccessException e) {
+			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
 			}
 		} else {
 			return getTestCaseId(codeRef, testStep.getDefinitionArgument());
 		}
+	}
+
+	static List<ParameterResource> getParameters(TestStep testStep, String text) {
+		List<ParameterResource> parameters = Lists.newArrayList();
+		Optional<String> parameterName = Optional.empty();
+		Matcher matcher = Pattern.compile(PARAMETER_REGEX).matcher(text);
+		if (matcher.find()) {
+			parameterName = Optional.of(text.substring(matcher.start() + 1, matcher.end() - 1));
+		}
+		if (!testStep.getDefinitionArgument().isEmpty() && parameterName.isPresent()) {
+			String key = parameterName.get();
+			parameters.addAll(testStep.getDefinitionArgument().stream().map(it -> {
+				ParameterResource parameterResource = new ParameterResource();
+				parameterResource.setKey(key);
+				parameterResource.setValue(it.getVal());
+				return parameterResource;
+			}).collect(Collectors.toList()));
+		}
+		return parameters;
 	}
 
 	private static Method retrieveMethod(Field definitionMatchField, TestStep testStep)
@@ -321,7 +335,8 @@ public class Utils {
 			values.add(argument.getVal());
 		}
 		return new TestCaseIdEntry(StringUtils.join(codeRef, values.toArray()),
-				Arrays.deepHashCode(new Object[] { codeRef, values.toArray() }));
+				Arrays.deepHashCode(new Object[] { codeRef, values.toArray() })
+		);
 	}
 
 	@Nullable
