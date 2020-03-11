@@ -286,16 +286,16 @@ public class Utils {
 		}
 	}
 
-	static List<ParameterResource> getParameters(TestStep testStep, String text) {
+	static List<ParameterResource> getParameters(List<cucumber.runtime.Argument> arguments, String text) {
 		List<ParameterResource> parameters = Lists.newArrayList();
 		Optional<String> parameterName = Optional.empty();
 		Matcher matcher = Pattern.compile(PARAMETER_REGEX).matcher(text);
 		if (matcher.find()) {
 			parameterName = Optional.of(text.substring(matcher.start() + 1, matcher.end() - 1));
 		}
-		if (!testStep.getDefinitionArgument().isEmpty() && parameterName.isPresent()) {
+		if (!arguments.isEmpty() && parameterName.isPresent()) {
 			String key = parameterName.get();
-			parameters.addAll(testStep.getDefinitionArgument().stream().map(it -> {
+			parameters.addAll(arguments.stream().map(it -> {
 				ParameterResource parameterResource = new ParameterResource();
 				parameterResource.setKey(key);
 				parameterResource.setValue(it.getVal());
