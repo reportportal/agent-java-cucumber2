@@ -27,7 +27,7 @@ public class LaunchLoggingContextTest {
 	private Launch launch;
 
 	@Test
-	public void verifyLaunchLoggingContextInit() {
+	public void verifyLaunchLoggingContextInitStepReporter() {
 		StepReporter stepReporter = new StepReporter() {
 			@Override
 			protected ReportPortal buildReportPortal() {
@@ -38,6 +38,22 @@ public class LaunchLoggingContextTest {
 		when(reportPortal.getParameters()).thenReturn(listenerParameters);
 		when(reportPortal.newLaunch(any())).thenReturn(launch);
 		stepReporter.beforeLaunch();
+
+		verify(launch, times(1)).start();
+	}
+
+	@Test
+	public void verifyLaunchLoggingContextInitScenarioReporter() {
+		ScenarioReporter scenarioReporter = new ScenarioReporter() {
+			@Override
+			protected ReportPortal buildReportPortal() {
+				return reportPortal;
+			}
+		};
+
+		when(reportPortal.getParameters()).thenReturn(listenerParameters);
+		when(reportPortal.newLaunch(any())).thenReturn(launch);
+		scenarioReporter.beforeLaunch();
 
 		verify(launch, times(1)).start();
 	}
