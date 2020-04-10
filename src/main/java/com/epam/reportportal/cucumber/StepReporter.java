@@ -21,7 +21,6 @@
 package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.Statuses;
-import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
@@ -78,11 +77,7 @@ public class StepReporter extends AbstractReporter {
 		rq.setParameters(Utils.getParameters(testStep.getDefinitionArgument(), step.getText()));
 		String codeRef = Utils.getCodeRef(testStep);
 		rq.setCodeRef(codeRef);
-		TestCaseIdEntry testCaseIdEntry = Utils.getTestCaseId(testStep, codeRef);
-		if (testCaseIdEntry != null) {
-			rq.setTestCaseId(testCaseIdEntry.getId());
-			rq.setTestCaseHash(testCaseIdEntry.getHash());
-		}
+		rq.setTestCaseId(Utils.getTestCaseId(testStep, codeRef).getId());
 		rq.setAttributes(Utils.getAttributes(testStep));
 		currentStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
 	}
