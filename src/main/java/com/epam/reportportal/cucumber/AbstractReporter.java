@@ -107,6 +107,7 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	protected void beforeLaunch() {
 		startLaunch();
+		RP.get().start();
 	}
 
 	/**
@@ -146,7 +147,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * Start Cucumber scenario
 	 */
 	protected void beforeScenario() {
-		Maybe<String> id = Utils.startNonLeafNode(RP.get(),
+		Maybe<String> id = Utils.startNonLeafNode(
+				RP.get(),
 				currentFeatureContext.getFeatureId(),
 				Utils.buildNodeName(currentScenarioContext.getKeyword(),
 						AbstractReporter.COLON_INFIX,
@@ -175,7 +177,8 @@ public abstract class AbstractReporter implements Formatter {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		Maybe<String> root = getRootItemId();
 		rq.setDescription(currentFeatureContext.getUri());
-		rq.setName(Utils.buildNodeName(currentFeatureContext.getFeature().getKeyword(),
+		rq.setName(Utils.buildNodeName(
+				currentFeatureContext.getFeature().getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				currentFeatureContext.getFeature().getName(),
 				null
@@ -209,7 +212,8 @@ public abstract class AbstractReporter implements Formatter {
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
 				rq.setAttributes(parameters.getAttributes() == null ? new HashSet<ItemAttributesRQ>() : parameters.getAttributes());
-				rq.getAttributes().addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
+				rq.getAttributes()
+						.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
 				rq.setDescription(parameters.getDescription());
 				rq.setRerun(parameters.isRerun());
 				if (!isNullOrEmpty(parameters.getRerunOf())) {
