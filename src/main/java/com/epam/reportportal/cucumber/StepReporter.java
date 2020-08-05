@@ -20,7 +20,6 @@
  */
 package com.epam.reportportal.cucumber;
 
-import com.epam.reportportal.listeners.Statuses;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
@@ -52,7 +51,7 @@ public class StepReporter extends AbstractReporter {
 
 	protected Maybe<String> currentStepId;
 	protected Maybe<String> hookStepId;
-	protected String hookStatus;
+	protected Result.Type hookStatus;
 
 	public StepReporter() {
 		super();
@@ -85,7 +84,7 @@ public class StepReporter extends AbstractReporter {
 	@Override
 	protected void afterStep(Result result) {
 		reportResult(result, null);
-		Utils.finishTestItem(RP.get(), currentStepId, result.getStatus().toString().toUpperCase());
+		Utils.finishTestItem(RP.get(), currentStepId, result.getStatus());
 		currentStepId = null;
 	}
 
@@ -97,7 +96,7 @@ public class StepReporter extends AbstractReporter {
 		rq.setType(isBefore ? "BEFORE_TEST" : "AFTER_TEST");
 
 		hookStepId = RP.get().startTestItem(currentScenarioContext.getId(), rq);
-		hookStatus = Statuses.PASSED;
+		hookStatus = Result.Type.PASSED;
 	}
 
 	@Override
@@ -109,7 +108,7 @@ public class StepReporter extends AbstractReporter {
 	@Override
 	protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
 		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
-		hookStatus = result.getStatus().toString();
+		hookStatus = result.getStatus();
 	}
 
 	@Override

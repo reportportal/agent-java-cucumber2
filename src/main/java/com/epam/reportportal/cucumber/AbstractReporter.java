@@ -166,7 +166,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * Finish Cucumber scenario
 	 */
 	protected void afterScenario(TestCaseFinished event) {
-		Utils.finishTestItem(RP.get(), currentScenarioContext.getId(), event.result.getStatus().toString());
+		Utils.finishTestItem(RP.get(), currentScenarioContext.getId(), event.result.getStatus());
 		currentScenarioContext = null;
 	}
 
@@ -211,7 +211,7 @@ public abstract class AbstractReporter implements Formatter {
 				rq.setName(parameters.getLaunchName());
 				rq.setStartTime(startTime);
 				rq.setMode(parameters.getLaunchRunningMode());
-				rq.setAttributes(parameters.getAttributes() == null ? new HashSet<ItemAttributesRQ>() : parameters.getAttributes());
+				rq.setAttributes(parameters.getAttributes() == null ? new HashSet<>() : parameters.getAttributes());
 				rq.getAttributes()
 						.addAll(SystemAttributesExtractor.extract(AGENT_PROPERTIES_FILE, AbstractReporter.class.getClassLoader()));
 				rq.setDescription(parameters.getDescription());
@@ -330,87 +330,44 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 
 	private EventHandler<TestRunStarted> getTestRunStartedHandler() {
-		return new EventHandler<TestRunStarted>() {
-			@Override
-			public void receive(TestRunStarted event) {
-				beforeLaunch();
-			}
-		};
+		return event -> beforeLaunch();
 	}
 
 	private EventHandler<TestSourceRead> getTestSourceReadHandler() {
-		return new EventHandler<TestSourceRead>() {
-			@Override
-			public void receive(TestSourceRead event) {
-				RunningContext.FeatureContext.addTestSourceReadEvent(event.uri, event);
-			}
-		};
+		return event -> RunningContext.FeatureContext.addTestSourceReadEvent(event.uri, event);
 	}
 
 	private EventHandler<TestCaseStarted> getTestCaseStartedHandler() {
-		return new EventHandler<TestCaseStarted>() {
-			@Override
-			public void receive(TestCaseStarted event) {
-				handleStartOfTestCase(event);
-			}
-		};
+		return this::handleStartOfTestCase;
 	}
 
 	private EventHandler<TestStepStarted> getTestStepStartedHandler() {
-		return new EventHandler<TestStepStarted>() {
-			@Override
-			public void receive(TestStepStarted event) {
-				handleTestStepStarted(event);
-			}
-		};
+		return this::handleTestStepStarted;
 	}
 
 	private EventHandler<TestStepFinished> getTestStepFinishedHandler() {
-		return new EventHandler<TestStepFinished>() {
-			@Override
-			public void receive(TestStepFinished event) {
-				handleTestStepFinished(event);
-			}
-		};
+		return this::handleTestStepFinished;
 	}
 
 	private EventHandler<TestCaseFinished> getTestCaseFinishedHandler() {
-		return new EventHandler<TestCaseFinished>() {
-			@Override
-			public void receive(TestCaseFinished event) {
-				afterScenario(event);
-			}
-		};
+		return this::afterScenario;
 	}
 
 	private EventHandler<TestRunFinished> getTestRunFinishedHandler() {
-		return new EventHandler<TestRunFinished>() {
-			@Override
-			public void receive(TestRunFinished event) {
-				if (currentFeatureContext != null) {
-					handleEndOfFeature();
-				}
-				afterLaunch();
+		return event -> {
+			if (currentFeatureContext != null) {
+				handleEndOfFeature();
 			}
+			afterLaunch();
 		};
 	}
 
 	private EventHandler<EmbedEvent> getEmbedEventHandler() {
-		return new EventHandler<EmbedEvent>() {
-			@Override
-			public void receive(EmbedEvent event) {
-				embedding(event.mimeType, event.data);
-			}
-		};
+		return event -> embedding(event.mimeType, event.data);
 	}
 
 	private EventHandler<WriteEvent> getWriteEventHandler() {
-		return new EventHandler<WriteEvent>() {
-			@Override
-			public void receive(WriteEvent event) {
-				write(event.text);
-			}
-		};
+		return event -> write(event.text);
 	}
 
 	private void handleStartOfFeature(TestCase testCase) {
@@ -459,5 +416,4 @@ public abstract class AbstractReporter implements Formatter {
 			afterStep(event.result);
 		}
 	}
-
 }
