@@ -71,7 +71,7 @@ public class LaunchSystemAttributesTest {
 
 		stepReporter.startLaunch();
 
-		stepReporter.RP.get().start().blockingGet();
+		stepReporter.launch.get().start().blockingGet();
 
 		ArgumentCaptor<StartLaunchRQ> launchRQArgumentCaptor = ArgumentCaptor.forClass(StartLaunchRQ.class);
 		verify(reportPortalClient, times(1)).startLaunch(launchRQArgumentCaptor.capture());

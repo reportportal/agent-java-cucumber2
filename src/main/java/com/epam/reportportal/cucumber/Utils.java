@@ -23,7 +23,6 @@ package com.epam.reportportal.cucumber;
 import com.epam.reportportal.annotations.TestCaseId;
 import com.epam.reportportal.annotations.attribute.Attributes;
 import com.epam.reportportal.listeners.ItemStatus;
-import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
@@ -48,6 +47,7 @@ import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
 import rp.com.google.common.collect.Lists;
 
+import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -94,8 +94,7 @@ public class Utils {
 			return null;
 		} else {
 			if (STATUS_MAPPING.get(status) == null) {
-				LOGGER.error(String.format(
-						"Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
+				LOGGER.error(String.format("Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
 						status
 				));
 				return ItemStatus.SKIPPED.name();
@@ -104,29 +103,40 @@ public class Utils {
 		}
 	}
 
-	public static void finishTestItem(Launch rp, Maybe<String> itemId) {
-		finishTestItem(rp, itemId, null);
-	}
-
-	public static void finishTestItem(Launch rp, Maybe<String> itemId, Result.Type status) {
+	static void finishFeature(Launch rp, Maybe<String> itemId, Date dateTime) {
 		if (itemId == null) {
 			LOGGER.error("BUG: Trying to finish unspecified test item.");
 			return;
 		}
+		FinishTestItemRQ rq = new FinishTestItemRQ();
+		rq.setEndTime(dateTime);
+		rp.finishTestItem(itemId, rq);
+	}
+
+	public static void finishTestItem(Launch rp, Maybe<String> itemId) {
+		finishTestItem(rp, itemId, null);
+	}
+
+	public static Date finishTestItem(Launch rp, Maybe<String> itemId, Result.Type status) {
+		if (itemId == null) {
+			LOGGER.error("BUG: Trying to finish unspecified test item.");
+			return null;
+		}
 
 		FinishTestItemRQ rq = new FinishTestItemRQ();
 		rq.setStatus(mapItemStatus(status));
-		rq.setEndTime(Calendar.getInstance().getTime());
-
+		Date currentDate = Calendar.getInstance().getTime();
+		rq.setEndTime(currentDate);
 		rp.finishTestItem(itemId, rq);
-
+		return currentDate;
 	}
 
-	public static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description,
+	public static Maybe<String> startNonLeafNode(Launch rp, Maybe<String> rootItemId, String name, String description, String codeRef,
 			Set<ItemAttributesRQ> attributes, String type) {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		rq.setName(name);
 		rq.setDescription(description);
+		rq.setCodeRef(codeRef);
 		rq.setAttributes(attributes);
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(type);
@@ -135,19 +145,16 @@ public class Utils {
 	}
 
 	public static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog(new Function<String, SaveLogRQ>() {
-			@Override
-			public SaveLogRQ apply(String item) {
-				SaveLogRQ rq = new SaveLogRQ();
-				rq.setMessage(message);
-				rq.setItemUuid(item);
-				rq.setLevel(level);
-				rq.setLogTime(Calendar.getInstance().getTime());
-				if (file != null) {
-					rq.setFile(file);
-				}
-				return rq;
+		ReportPortal.emitLog((Function<String, SaveLogRQ>) item -> {
+			SaveLogRQ rq = new SaveLogRQ();
+			rq.setMessage(message);
+			rq.setItemUuid(item);
+			rq.setLevel(level);
+			rq.setLogTime(Calendar.getInstance().getTime());
+			if (file != null) {
+				rq.setFile(file);
 			}
+			return rq;
 		});
 	}
 
@@ -158,7 +165,7 @@ public class Utils {
 	 * @return set of attributes
 	 */
 	public static Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
-		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
+		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (PickleTag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
 		}
@@ -172,7 +179,7 @@ public class Utils {
 	 * @return set of attributes
 	 */
 	public static Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
-		Set<ItemAttributesRQ> attributes = new HashSet<ItemAttributesRQ>();
+		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (Tag tag : tags) {
 			attributes.add(new ItemAttributesRQ(null, tag.getName()));
 		}
@@ -186,15 +193,13 @@ public class Utils {
 	 * @return regular log level
 	 */
 	public static String mapLevel(String cukesStatus) {
-		String mapped = null;
 		if (cukesStatus.equalsIgnoreCase("passed")) {
-			mapped = "INFO";
+			return "INFO";
 		} else if (cukesStatus.equalsIgnoreCase("skipped")) {
-			mapped = "WARN";
+			return "WARN";
 		} else {
-			mapped = "ERROR";
+			return "ERROR";
 		}
-		return mapped;
 	}
 
 	/**
@@ -252,6 +257,17 @@ public class Utils {
 		return marg.toString();
 	}
 
+	static String getStepName(TestStep step) {
+		String stepName;
+		if (step.isHook()) {
+			stepName = "Hook: " + step.getHookType().toString();
+		} else {
+			stepName = step.getPickleStep().getText();
+		}
+
+		return stepName;
+	}
+
 	@Nullable
 	public static Set<ItemAttributesRQ> getAttributes(TestStep testStep) {
 		Field definitionMatchField = getDefinitionMatchField(testStep);
@@ -303,7 +319,8 @@ public class Utils {
 				return ofNullable(testCaseIdAnnotation).flatMap(annotation -> ofNullable(getTestCaseId(annotation,
 						method,
 						testStep.getDefinitionArgument()
-				))).orElseGet(() -> getTestCaseId(codeRef, testStep.getDefinitionArgument()));
+				)))
+						.orElseGet(() -> getTestCaseId(codeRef, testStep.getDefinitionArgument()));
 			} catch (NoSuchFieldException | IllegalAccessException e) {
 				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
 			}
@@ -346,7 +363,7 @@ public class Utils {
 	@Nullable
 	private static TestCaseIdEntry getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.runtime.Argument> arguments) {
 		if (testCaseId.parametrized()) {
-			List<String> values = new ArrayList<String>(arguments.size());
+			List<String> values = new ArrayList<>(arguments.size());
 			for (cucumber.runtime.Argument argument : arguments) {
 				values.add(argument.getVal());
 			}
@@ -356,15 +373,15 @@ public class Utils {
 		}
 	}
 
+	private static final Function<List<cucumber.runtime.Argument>, String> TRANSFORM_PARAMETERS = args -> ofNullable(args).map(a -> a.stream()
+			.map(cucumber.runtime.Argument::getVal)
+			.collect(Collectors.joining(",", "[", "]"))).orElse("");
+
 	private static TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.runtime.Argument> arguments) {
 		return ofNullable(arguments).filter(args -> !args.isEmpty())
 				.map(args -> new TestCaseIdEntry(codeRef + TRANSFORM_PARAMETERS.apply(args)))
 				.orElseGet(() -> new TestCaseIdEntry(codeRef));
 	}
-
-	private static final Function<List<cucumber.runtime.Argument>, String> TRANSFORM_PARAMETERS = it -> "[" + it.stream()
-			.map(cucumber.runtime.Argument::getVal)
-			.collect(Collectors.joining(",")) + "]";
 
 	@Nullable
 	private static Field getDefinitionMatchField(TestStep testStep) {
@@ -387,5 +404,15 @@ public class Utils {
 
 			return null;
 		}
+	}
+
+	@Nonnull
+	public static String getDescription(@Nonnull String uri) {
+		return uri;
+	}
+
+	@Nonnull
+	public static String getCodeRef(@Nonnull String uri, int line) {
+		return uri + ":" + line;
 	}
 }
