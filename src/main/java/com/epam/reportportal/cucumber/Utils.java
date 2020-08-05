@@ -22,6 +22,7 @@ package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.annotations.TestCaseId;
 import com.epam.reportportal.annotations.attribute.Attributes;
+import com.epam.reportportal.listeners.ItemStatus;
 import com.epam.reportportal.listeners.Statuses;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
@@ -34,6 +35,7 @@ import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
+import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
 import gherkin.ast.Tag;
@@ -68,30 +70,52 @@ public class Utils {
 	private static final String METHOD_FIELD_NAME = "method";
 	private static final String PARAMETER_REGEX = "<[^<>]+>";
 
+	private Utils() {
+	}
+
 	//@formatter:off
-	private static final Map<String, String> STATUS_MAPPING = ImmutableMap.<String, String>builder()
-			.put("passed", Statuses.PASSED)
-			.put("skipped", Statuses.SKIPPED)
-			//TODO replace with NOT_IMPLEMENTED in future
-			.put("undefined", Statuses.SKIPPED).build();
+	private static final Map<Result.Type, ItemStatus> STATUS_MAPPING = ImmutableMap.<Result.Type, ItemStatus>builder()
+			.put(Result.Type.PASSED, ItemStatus.PASSED)
+			.put(Result.Type.FAILED, ItemStatus.FAILED)
+			.put(Result.Type.SKIPPED, ItemStatus.SKIPPED)
+			.put(Result.Type.PENDING, ItemStatus.SKIPPED)
+			.put(Result.Type.UNDEFINED, ItemStatus.SKIPPED)
+			.put(Result.Type.AMBIGUOUS, ItemStatus.SKIPPED).build();
 	//@formatter:on
 
-	private Utils() {
-
+	/**
+	 * Map Cucumber statuses to RP item statuses
+	 *
+	 * @param status - Cucumber status
+	 * @return RP test item status and null if status is null
+	 */
+	static String mapItemStatus(Result.Type status) {
+		if (status == null) {
+			return null;
+		} else {
+			if (STATUS_MAPPING.get(status) == null) {
+				LOGGER.error(String.format(
+						"Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
+						status
+				));
+				return ItemStatus.SKIPPED.name();
+			}
+			return STATUS_MAPPING.get(status).name();
+		}
 	}
 
 	public static void finishTestItem(Launch rp, Maybe<String> itemId) {
 		finishTestItem(rp, itemId, null);
 	}
 
-	public static void finishTestItem(Launch rp, Maybe<String> itemId, String status) {
+	public static void finishTestItem(Launch rp, Maybe<String> itemId, Result.Type status) {
 		if (itemId == null) {
 			LOGGER.error("BUG: Trying to finish unspecified test item.");
 			return;
 		}
 
 		FinishTestItemRQ rq = new FinishTestItemRQ();
-		rq.setStatus(status);
+		rq.setStatus(mapItemStatus(status));
 		rq.setEndTime(Calendar.getInstance().getTime());
 
 		rp.finishTestItem(itemId, rq);
