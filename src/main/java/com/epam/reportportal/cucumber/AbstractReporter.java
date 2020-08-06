@@ -180,7 +180,7 @@ public abstract class AbstractReporter implements Formatter {
 	protected void startLaunch() {
 		launch = Suppliers.memoize(new Supplier<Launch>() {
 
-			/* should no be lazy */
+			/* should not be lazy */
 			private final Date startTime = Calendar.getInstance().getTime();
 
 			@Override
