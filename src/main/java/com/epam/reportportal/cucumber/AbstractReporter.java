@@ -146,8 +146,7 @@ public abstract class AbstractReporter implements Formatter {
 			RunningContext.ScenarioContext currentScenarioContext, String scenarioName) {
 		String description = getDescription(currentFeatureContext.getUri());
 		String codeRef = getCodeRef(currentFeatureContext.getUri(), currentScenarioContext.getLine());
-		Maybe<String> id = Utils.startNonLeafNode(
-				launch.get(),
+		Maybe<String> id = Utils.startNonLeafNode(launch.get(),
 				currentFeatureContext.getFeatureId(),
 				scenarioName,
 				description,
@@ -310,10 +309,9 @@ public abstract class AbstractReporter implements Formatter {
 		return threadCurrentScenarioContextMap.get(Thread.currentThread().getId());
 	}
 
-	private RunningContext.FeatureContext createFeatureContext(TestCase testCase, String featureURI) {
+	private RunningContext.FeatureContext createFeatureContext(TestCase testCase) {
 		RunningContext.FeatureContext currentFeatureContext;
 		currentFeatureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
-		currentFeatureContextMap.put(featureURI, currentFeatureContext);
 		String featureKeyword = currentFeatureContext.getFeature().getKeyword();
 		String featureName = currentFeatureContext.getFeature().getName();
 
@@ -384,17 +382,16 @@ public abstract class AbstractReporter implements Formatter {
 		TestCase testCase = event.testCase;
 		RunningContext.FeatureContext featureContext = new RunningContext.FeatureContext().processTestSourceReadEvent(testCase);
 		String featureUri = featureContext.getUri();
-		RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.get(featureUri);
-
-		currentFeatureContext = currentFeatureContext == null ? createFeatureContext(testCase, featureUri) : currentFeatureContext;
+		RunningContext.FeatureContext currentFeatureContext = currentFeatureContextMap.computeIfAbsent(featureUri,
+				u -> createFeatureContext(testCase)
+		);
 
 		if (!currentFeatureContext.getUri().equals(testCase.getUri())) {
 			throw new IllegalStateException("Scenario URI does not match Feature URI.");
 		}
 
 		RunningContext.ScenarioContext scenarioContext = currentFeatureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildNodeName(
-				scenarioContext.getKeyword(),
+		String scenarioName = Utils.buildNodeName(scenarioContext.getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				scenarioContext.getName(),
 				scenarioContext.getOutlineIteration()
