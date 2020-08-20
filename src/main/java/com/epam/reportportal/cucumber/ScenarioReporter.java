@@ -52,6 +52,9 @@ import java.util.Calendar;
  */
 public class ScenarioReporter extends AbstractReporter {
     private static final String SEPARATOR = "-------------------------";
+    private static final String EMPTY_SUFFIX = "";
+    private static final String INFO = "INFO";
+    private static final String STEP_ = "STEP ";
 
     protected Supplier<Maybe<String>> rootSuiteId;
 
@@ -63,15 +66,21 @@ public class ScenarioReporter extends AbstractReporter {
 
     @Override
     protected void beforeStep(TestStep testStep) {
+        RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
         Step step = currentScenarioContext.getStep(testStep);
-        String decoratedStepName = decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(), step.getKeyword(), testStep.getStepText(), " "));
+        int lineInFeatureFile = step.getLocation().getLine();
+        String decoratedStepName = lineInFeatureFile + decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(),
+                step.getKeyword(),
+                Utils.getStepName(testStep),
+                EMPTY_SUFFIX
+        ));
         String multilineArg = Utils.buildMultilineArgument(testStep);
-        Utils.sendLog(decoratedStepName + multilineArg, "INFO", null);
+        Utils.sendLog(decoratedStepName + multilineArg, INFO, null);
     }
 
     @Override
     protected void afterStep(Result result) {
-        reportResult(result, decorateMessage("STEP " + result.getStatus().toString().toUpperCase()));
+        reportResult(result, decorateMessage(STEP_ + result.getStatus().toString().toUpperCase()));
     }
 
     @Override
@@ -115,7 +124,7 @@ public class ScenarioReporter extends AbstractReporter {
      * Start root suite
      */
     protected void finishRootItem() {
-        Utils.finishTestItem(RP.get(), rootSuiteId.get());
+        Utils.finishTestItem(launch.get(), rootSuiteId.get());
         rootSuiteId = null;
     }
 
@@ -123,15 +132,12 @@ public class ScenarioReporter extends AbstractReporter {
      * Start root suite
      */
     protected void startRootItem() {
-        rootSuiteId = Suppliers.memoize(new Supplier<Maybe<String>>() {
-            @Override
-            public Maybe<String> get() {
-                StartTestItemRQ rq = new StartTestItemRQ();
-                rq.setName("Root User Story");
-                rq.setStartTime(Calendar.getInstance().getTime());
-                rq.setType("STORY");
-                return RP.get().startTestItem(rq);
-            }
+        rootSuiteId = Suppliers.memoize(() -> {
+            StartTestItemRQ rq = new StartTestItemRQ();
+            rq.setName("Root User Story");
+            rq.setStartTime(Calendar.getInstance().getTime());
+            rq.setType("STORY");
+            return launch.get().startTestItem(rq);
         });
     }
 
