@@ -43,7 +43,6 @@ import io.reactivex.Maybe;
 import io.reactivex.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rp.com.google.common.base.Function;
 import rp.com.google.common.collect.ImmutableMap;
 import rp.com.google.common.collect.Lists;
 
@@ -140,12 +139,15 @@ public class Utils {
 		rq.setAttributes(attributes);
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(type);
+		if ("STEP".equals(type)) {
+			rq.setTestCaseId(TestCaseIdUtils.getTestCaseId(codeRef, null).getId());
+		}
 
 		return rp.startTestItem(rootItemId, rq);
 	}
 
 	public static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog((Function<String, SaveLogRQ>) item -> {
+		ReportPortal.emitLog(item -> {
 			SaveLogRQ rq = new SaveLogRQ();
 			rq.setMessage(message);
 			rq.setItemUuid(item);
@@ -310,25 +312,6 @@ public class Utils {
 		}
 	}
 
-	public static TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
-		Field definitionMatchField = getDefinitionMatchField(testStep);
-		if (definitionMatchField != null) {
-			try {
-				Method method = retrieveMethod(definitionMatchField, testStep);
-				TestCaseId testCaseIdAnnotation = method.getAnnotation(TestCaseId.class);
-				return ofNullable(testCaseIdAnnotation).flatMap(annotation -> ofNullable(getTestCaseId(annotation,
-						method,
-						testStep.getDefinitionArgument()
-				)))
-						.orElseGet(() -> getTestCaseId(codeRef, testStep.getDefinitionArgument()));
-			} catch (NoSuchFieldException | IllegalAccessException e) {
-				return getTestCaseId(codeRef, testStep.getDefinitionArgument());
-			}
-		} else {
-			return getTestCaseId(codeRef, testStep.getDefinitionArgument());
-		}
-	}
-
 	static List<ParameterResource> getParameters(List<cucumber.runtime.Argument> arguments, String text) {
 		List<ParameterResource> parameters = Lists.newArrayList();
 		List<String> parameterNames = Lists.newArrayList();
@@ -360,27 +343,29 @@ public class Utils {
 		return (Method) methodField.get(javaStepDefinition);
 	}
 
-	@Nullable
-	private static TestCaseIdEntry getTestCaseId(TestCaseId testCaseId, Method method, List<cucumber.runtime.Argument> arguments) {
-		if (testCaseId.parametrized()) {
-			List<String> values = new ArrayList<>(arguments.size());
-			for (cucumber.runtime.Argument argument : arguments) {
-				values.add(argument.getVal());
+	private static final java.util.function.Function<List<cucumber.runtime.Argument>, List<?>> ARGUMENTS_TRANSFORM = arguments -> ofNullable(
+			arguments).map(args -> args.stream().map(cucumber.runtime.Argument::getVal).collect(Collectors.toList())).orElse(null);
+
+	@SuppressWarnings("unchecked")
+	public static TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+		if (definitionMatchField != null) {
+			try {
+				Method method = retrieveMethod(definitionMatchField, testStep);
+				return TestCaseIdUtils.getTestCaseId(method.getAnnotation(TestCaseId.class),
+						method,
+						codeRef,
+						(List<Object>) ARGUMENTS_TRANSFORM.apply(testStep.getDefinitionArgument())
+				);
+			} catch (NoSuchFieldException | IllegalAccessException ignore) {
 			}
-			return TestCaseIdUtils.getParameterizedTestCaseId(method, values.toArray());
-		} else {
-			return new TestCaseIdEntry(testCaseId.value());
 		}
+		return getTestCaseId(codeRef, testStep.getDefinitionArgument());
 	}
 
-	private static final Function<List<cucumber.runtime.Argument>, String> TRANSFORM_PARAMETERS = args -> ofNullable(args).map(a -> a.stream()
-			.map(cucumber.runtime.Argument::getVal)
-			.collect(Collectors.joining(",", "[", "]"))).orElse("");
-
+	@SuppressWarnings("unchecked")
 	private static TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.runtime.Argument> arguments) {
-		return ofNullable(arguments).filter(args -> !args.isEmpty())
-				.map(args -> new TestCaseIdEntry(codeRef + TRANSFORM_PARAMETERS.apply(args)))
-				.orElseGet(() -> new TestCaseIdEntry(codeRef));
+		return TestCaseIdUtils.getTestCaseId(codeRef, (List<Object>) ARGUMENTS_TRANSFORM.apply(arguments));
 	}
 
 	@Nullable

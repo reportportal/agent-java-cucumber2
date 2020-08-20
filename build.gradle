@@ -1,4 +1,4 @@
-apply plugin: 'java'
+apply plugin: 'java-library'
 
 project.ext.releaseMode = project.hasProperty('releaseMode')
 
@@ -32,10 +32,11 @@ publishing {
 }
 
 dependencies {
-    implementation 'com.epam.reportportal:client-java:5.0.2'
-    implementation 'com.epam.reportportal:commons-model:5.0.0'
+    api 'com.epam.reportportal:client-java:5.0.6'
+    api 'com.epam.reportportal:commons-model:5.0.0'
+    api 'com.google.code.findbugs:jsr305:3.0.2'
+
     implementation 'io.cucumber:cucumber-java:2.4.0'
-    implementation 'com.google.code.findbugs:jsr305:3.0.2'
 
     testImplementation 'io.cucumber:cucumber-testng:2.4.0'
     testImplementation 'org.hamcrest:hamcrest-core:2.2'
