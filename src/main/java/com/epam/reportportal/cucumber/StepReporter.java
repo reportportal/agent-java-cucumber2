@@ -49,15 +49,8 @@ import java.util.Calendar;
  */
 public class StepReporter extends AbstractReporter {
 
-	protected Maybe<String> currentStepId;
-	protected Maybe<String> hookStepId;
-	protected Result.Type hookStatus;
-
 	public StepReporter() {
 		super();
-		currentStepId = null;
-		hookStepId = null;
-		hookStatus = null;
 	}
 
 	@Override
@@ -69,24 +62,16 @@ public class StepReporter extends AbstractReporter {
 	protected void beforeStep(TestStep testStep) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
 		Step step = context.getStep(testStep);
-		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setName(Utils.buildNodeName(context.getStepPrefix(), step.getKeyword(), testStep.getStepText(), " "));
-		rq.setDescription(Utils.buildMultilineArgument(testStep));
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType("STEP");
-		rq.setParameters(Utils.getParameters(testStep.getDefinitionArgument(), step.getText()));
-		String codeRef = Utils.getCodeRef(testStep);
-		rq.setCodeRef(codeRef);
-		rq.setTestCaseId(Utils.getTestCaseId(testStep, codeRef).getId());
-		rq.setAttributes(Utils.getAttributes(testStep));
-		currentStepId = launch.get().startTestItem(context.getId(), rq);
+		StartTestItemRQ rq = Utils.buildStartStepRequest(context.getStepPrefix(), testStep, step, true);
+		context.setCurrentStepId(launch.get().startTestItem(context.getId(), rq));
 	}
 
 	@Override
 	protected void afterStep(Result result) {
 		reportResult(result, null);
-		Utils.finishTestItem(launch.get(), currentStepId, result.getStatus());
-		currentStepId = null;
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Utils.finishTestItem(launch.get(), context.getCurrentStepId(), result.getStatus());
+		context.setCurrentStepId(null);
 	}
 
 	@Override
@@ -96,20 +81,23 @@ public class StepReporter extends AbstractReporter {
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(isBefore ? "BEFORE_TEST" : "AFTER_TEST");
 
-		hookStepId = launch.get().startTestItem(getCurrentScenarioContext().getId(), rq);
-		hookStatus = Result.Type.PASSED;
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		context.setHookStepId(launch.get().startTestItem(context.getId(), rq));
+		context.setHookStatus(Result.Type.PASSED);
 	}
 
 	@Override
 	protected void afterHooks(Boolean isBefore) {
-		Utils.finishTestItem(launch.get(), hookStepId, hookStatus);
-		hookStepId = null;
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Utils.finishTestItem(launch.get(), context.getHookStepId(), context.getHookStatus());
+		context.setHookStepId(null);
 	}
 
 	@Override
 	protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
 		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
-		hookStatus = result.getStatus();
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		context.setHookStatus(result.getStatus());
 	}
 
 	@Override

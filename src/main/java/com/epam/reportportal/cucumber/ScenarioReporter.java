@@ -51,103 +51,96 @@ import java.util.Calendar;
  * @author Serhii Zharskyi
  */
 public class ScenarioReporter extends AbstractReporter {
-    private static final String SEPARATOR = "-------------------------";
-    private static final String EMPTY_SUFFIX = "";
-    private static final String INFO = "INFO";
-    private static final String STEP_ = "STEP ";
 
-    protected Supplier<Maybe<String>> rootSuiteId;
+	protected Supplier<Maybe<String>> rootSuiteId;
 
-    @Override
-    protected void beforeLaunch() {
-        super.beforeLaunch();
-        startRootItem();
-    }
+	@Override
+	protected void beforeLaunch() {
+		super.beforeLaunch();
+		startRootItem();
+	}
 
-    @Override
-    protected void beforeStep(TestStep testStep) {
-        RunningContext.ScenarioContext currentScenarioContext = getCurrentScenarioContext();
-        Step step = currentScenarioContext.getStep(testStep);
-        int lineInFeatureFile = step.getLocation().getLine();
-        String decoratedStepName = lineInFeatureFile + decorateMessage(Utils.buildNodeName(currentScenarioContext.getStepPrefix(),
-                step.getKeyword(),
-                Utils.getStepName(testStep),
-                EMPTY_SUFFIX
-        ));
-        String multilineArg = Utils.buildMultilineArgument(testStep);
-        Utils.sendLog(decoratedStepName + multilineArg, INFO, null);
-    }
+	@Override
+	protected void beforeStep(TestStep testStep) {
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Step step = context.getStep(testStep);
+		StartTestItemRQ rq = Utils.buildStartStepRequest(context.getStepPrefix(), testStep, step, true);
+		rq.setHasStats(false);
+		context.setCurrentStepId(launch.get().startTestItem(context.getId(), rq));
+	}
 
-    @Override
-    protected void afterStep(Result result) {
-        reportResult(result, decorateMessage(STEP_ + result.getStatus().toString().toUpperCase()));
-    }
+	@Override
+	protected void afterStep(Result result) {
+		reportResult(result, null);
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Utils.finishTestItem(launch.get(), context.getCurrentStepId(), result.getStatus());
+		context.setCurrentStepId(null);
+	}
 
-    @Override
-    protected void beforeHooks(Boolean isBefore) {
-        // noop
-    }
+	@Override
+	protected void beforeHooks(Boolean isBefore) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setHasStats(false);
+		rq.setName(isBefore ? "Before hooks" : "After hooks");
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType(isBefore ? "BEFORE_TEST" : "AFTER_TEST");
 
-    @Override
-    protected void afterHooks(Boolean isBefore) {
-        // noop
-    }
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		context.setHookStepId(launch.get().startTestItem(context.getId(), rq));
+		context.setHookStatus(Result.Type.PASSED);
+	}
 
-    @Override
-    protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
-        reportResult(result, (isBefore ? "@Before" : "@After") + "\n" + step.getCodeLocation());
-    }
+	@Override
+	protected void afterHooks(Boolean isBefore) {
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Utils.finishTestItem(launch.get(), context.getHookStepId(), context.getHookStatus());
+		context.setHookStepId(null);
+	}
 
-    @Override
-    protected String getFeatureTestItemType() {
-        return "TEST";
-    }
+	@Override
+	protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
+		reportResult(result, (isBefore ? "@Before" : "@After") + "\n" + step.getCodeLocation());
+	}
 
-    @Override
-    protected String getScenarioTestItemType() {
-        return "STEP";
-    }
+	@Override
+	protected String getFeatureTestItemType() {
+		return "TEST";
+	}
 
+	@Override
+	protected String getScenarioTestItemType() {
+		return "STEP";
+	}
 
-    @Override
-    protected Maybe<String> getRootItemId() {
-        return rootSuiteId.get();
-    }
+	@Override
+	protected Maybe<String> getRootItemId() {
+		return rootSuiteId.get();
+	}
 
-    @Override
-    protected void afterLaunch() {
-        finishRootItem();
-        super.afterLaunch();
-    }
+	@Override
+	protected void afterLaunch() {
+		finishRootItem();
+		super.afterLaunch();
+	}
 
-    /**
-     * Start root suite
-     */
-    protected void finishRootItem() {
-        Utils.finishTestItem(launch.get(), rootSuiteId.get());
-        rootSuiteId = null;
-    }
+	/**
+	 * Start root suite
+	 */
+	protected void finishRootItem() {
+		Utils.finishTestItem(launch.get(), rootSuiteId.get());
+		rootSuiteId = null;
+	}
 
-    /**
-     * Start root suite
-     */
-    protected void startRootItem() {
-        rootSuiteId = Suppliers.memoize(() -> {
-            StartTestItemRQ rq = new StartTestItemRQ();
-            rq.setName("Root User Story");
-            rq.setStartTime(Calendar.getInstance().getTime());
-            rq.setType("STORY");
-            return launch.get().startTestItem(rq);
-        });
-    }
-
-    /**
-     * Add separators to log item to distinguish from real log messages
-     *
-     * @param message to decorate
-     * @return decorated message
-     */
-    private String decorateMessage(String message) {
-        return ScenarioReporter.SEPARATOR + message + ScenarioReporter.SEPARATOR;
-    }
+	/**
+	 * Start root suite
+	 */
+	protected void startRootItem() {
+		rootSuiteId = Suppliers.memoize(() -> {
+			StartTestItemRQ rq = new StartTestItemRQ();
+			rq.setName("Root User Story");
+			rq.setStartTime(Calendar.getInstance().getTime());
+			rq.setType("STORY");
+			return launch.get().startTestItem(rq);
+		});
+	}
 }

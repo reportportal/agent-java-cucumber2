@@ -37,6 +37,7 @@ import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
+import gherkin.ast.Step;
 import gherkin.ast.Tag;
 import gherkin.pickles.*;
 import io.reactivex.Maybe;
@@ -399,5 +400,20 @@ public class Utils {
 	@Nonnull
 	public static String getCodeRef(@Nonnull String uri, int line) {
 		return uri + ":" + line;
+	}
+
+	public static StartTestItemRQ buildStartStepRequest(String stepPrefix, TestStep testStep, Step step, boolean hasStats) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setName(Utils.buildNodeName(stepPrefix, step.getKeyword(), testStep.getStepText(), ""));
+		rq.setDescription(Utils.buildMultilineArgument(testStep));
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType("STEP");
+		rq.setHasStats(hasStats);
+		rq.setParameters(Utils.getParameters(testStep.getDefinitionArgument(), step.getText()));
+		String codeRef = Utils.getCodeRef(testStep);
+		rq.setCodeRef(codeRef);
+		rq.setTestCaseId(Utils.getTestCaseId(testStep, codeRef).getId());
+		rq.setAttributes(Utils.getAttributes(testStep));
+		return rq;
 	}
 }
