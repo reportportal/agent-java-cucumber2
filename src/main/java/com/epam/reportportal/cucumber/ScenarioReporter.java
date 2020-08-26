@@ -51,6 +51,9 @@ import java.util.Calendar;
  * @author Serhii Zharskyi
  */
 public class ScenarioReporter extends AbstractReporter {
+	private static final String RP_STORY_TYPE = "SUITE";
+	private static final String RP_TEST_TYPE = "STORY";
+	private static final String RP_STEP_TYPE = "STEP";
 
 	protected Supplier<Maybe<String>> rootSuiteId;
 
@@ -104,12 +107,12 @@ public class ScenarioReporter extends AbstractReporter {
 
 	@Override
 	protected String getFeatureTestItemType() {
-		return "TEST";
+		return RP_TEST_TYPE;
 	}
 
 	@Override
 	protected String getScenarioTestItemType() {
-		return "STEP";
+		return RP_STEP_TYPE;
 	}
 
 	@Override
@@ -139,7 +142,7 @@ public class ScenarioReporter extends AbstractReporter {
 			StartTestItemRQ rq = new StartTestItemRQ();
 			rq.setName("Root User Story");
 			rq.setStartTime(Calendar.getInstance().getTime());
-			rq.setType("STORY");
+			rq.setType(RP_STORY_TYPE);
 			return launch.get().startTestItem(rq);
 		});
 	}
