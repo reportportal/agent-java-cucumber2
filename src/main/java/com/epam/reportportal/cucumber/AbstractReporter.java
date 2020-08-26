@@ -390,11 +390,11 @@ public abstract class AbstractReporter implements Formatter {
 			throw new IllegalStateException("Scenario URI does not match Feature URI.");
 		}
 
-		RunningContext.ScenarioContext futureContext = currentFeatureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildNodeName(futureContext.getKeyword(),
+		RunningContext.ScenarioContext context = currentFeatureContext.getScenarioContext(testCase);
+		String scenarioName = Utils.buildNodeName(context.getKeyword(),
 				AbstractReporter.COLON_INFIX,
-				futureContext.getName(),
-				futureContext.getOutlineIteration()
+				context.getName(),
+				context.getOutlineIteration()
 		);
 
 		Pair<String, String> scenarioNameFeatureURI = Pair.of(testCase.getScenarioDesignation(), currentFeatureContext.getUri());
