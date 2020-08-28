@@ -1,6 +1,11 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- A bug when ambiguous item cases a Null Pointer Exception
+- Incorrect item type settings
+### Added
+- Nested steps support
 
 ## [5.0.0-BETA-13]
 ### Added

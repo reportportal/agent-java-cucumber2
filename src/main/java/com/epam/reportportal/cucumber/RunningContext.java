@@ -1,6 +1,7 @@
 package com.epam.reportportal.cucumber;
 
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
+import cucumber.api.Result;
 import cucumber.api.TestCase;
 import cucumber.api.TestStep;
 import cucumber.api.event.TestSourceRead;
@@ -138,13 +139,17 @@ public class RunningContext {
 		private final Map<Integer, Step> scenarioLocationMap = new HashMap<>();
 		private Set<ItemAttributesRQ> attributes = new HashSet<>();
 
-		private Maybe<String> id = null;
+		private Maybe<String> id;
+		private Maybe<String> currentStepId;
 		private Background background;
 		private ScenarioDefinition scenario;
 		private String scenarioDesignation;
 		private TestCase testCase;
 		private boolean hasBackground = false;
 		private String outlineIteration;
+
+		private Maybe<String> hookStepId;
+		private Result.Type hookStatus;
 
 		void processScenario(ScenarioDefinition scenario) {
 			this.scenario = scenario;
@@ -267,5 +272,30 @@ public class RunningContext {
 		String getOutlineIteration() {
 			return outlineIteration;
 		}
+
+		public Maybe<String> getCurrentStepId() {
+			return currentStepId;
+		}
+
+		public void setCurrentStepId(Maybe<String> currentStepId) {
+			this.currentStepId = currentStepId;
+		}
+
+		public Maybe<String> getHookStepId() {
+			return hookStepId;
+		}
+
+		public void setHookStepId(Maybe<String> hookStepId) {
+			this.hookStepId = hookStepId;
+		}
+
+		public Result.Type getHookStatus() {
+			return hookStatus;
+		}
+
+		public void setHookStatus(Result.Type hookStatus) {
+			this.hookStatus = hookStatus;
+		}
+
 	}
 }
