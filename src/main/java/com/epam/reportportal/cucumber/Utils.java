@@ -313,6 +313,11 @@ public class Utils {
 		}
 	}
 
+	@Nonnull
+	public static String getCodeRef(@Nonnull String uri, int line) {
+		return uri + ":" + line;
+	}
+
 	static List<ParameterResource> getParameters(List<cucumber.runtime.Argument> arguments, String text) {
 		List<ParameterResource> parameters = Lists.newArrayList();
 		List<String> parameterNames = Lists.newArrayList();
@@ -395,11 +400,6 @@ public class Utils {
 	@Nonnull
 	public static String getDescription(@Nonnull String uri) {
 		return uri;
-	}
-
-	@Nonnull
-	public static String getCodeRef(@Nonnull String uri, int line) {
-		return uri + ":" + line;
 	}
 
 	public static StartTestItemRQ buildStartStepRequest(String stepPrefix, TestStep testStep, Step step, boolean hasStats) {
