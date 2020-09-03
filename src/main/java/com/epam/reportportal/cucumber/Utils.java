@@ -27,6 +27,7 @@ import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.utils.AttributeParser;
+import com.epam.reportportal.utils.ParameterUtils;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.ParameterResource;
@@ -42,18 +43,16 @@ import gherkin.ast.Tag;
 import gherkin.pickles.*;
 import io.reactivex.Maybe;
 import io.reactivex.annotations.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rp.com.google.common.collect.ImmutableMap;
-import rp.com.google.common.collect.Lists;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -68,7 +67,6 @@ public class Utils {
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
 	private static final String METHOD_FIELD_NAME = "method";
-	private static final String PARAMETER_REGEX = "<[^<>]+>";
 
 	private Utils() {
 	}
@@ -260,17 +258,6 @@ public class Utils {
 		return marg.toString();
 	}
 
-	static String getStepName(TestStep step) {
-		String stepName;
-		if (step.isHook()) {
-			stepName = "Hook: " + step.getHookType().toString();
-		} else {
-			stepName = step.getPickleStep().getText();
-		}
-
-		return stepName;
-	}
-
 	@Nullable
 	public static Set<ItemAttributesRQ> getAttributes(TestStep testStep) {
 		Field definitionMatchField = getDefinitionMatchField(testStep);
@@ -318,24 +305,11 @@ public class Utils {
 		return uri + ":" + line;
 	}
 
-	static List<ParameterResource> getParameters(List<cucumber.runtime.Argument> arguments, String text) {
-		List<ParameterResource> parameters = Lists.newArrayList();
-		List<String> parameterNames = Lists.newArrayList();
-		Matcher matcher = Pattern.compile(PARAMETER_REGEX).matcher(text);
-		while (matcher.find()) {
-			parameterNames.add(text.substring(matcher.start() + 1, matcher.end() - 1));
-		}
-		IntStream.range(0, parameterNames.size()).forEach(index -> {
-			String key = parameterNames.get(index);
-			if (index < arguments.size()) {
-				String val = arguments.get(index).getVal();
-				ParameterResource parameterResource = new ParameterResource();
-				parameterResource.setKey(key);
-				parameterResource.setValue(val);
-				parameters.add(parameterResource);
-			}
-		});
-		return parameters;
+	static List<ParameterResource> getParameters(String codeRef, List<cucumber.runtime.Argument> arguments) {
+		List<Pair<String, String>> params = ofNullable(arguments).map(a -> IntStream.range(0, a.size())
+				.mapToObj(i -> Pair.of("arg" + i, a.get(i).getVal()))
+				.collect(Collectors.toList())).orElse(null);
+		return ParameterUtils.getParameters(codeRef, params);
 	}
 
 	private static Method retrieveMethod(Field definitionMatchField, TestStep testStep)
@@ -409,8 +383,8 @@ public class Utils {
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType("STEP");
 		rq.setHasStats(hasStats);
-		rq.setParameters(Utils.getParameters(testStep.getDefinitionArgument(), step.getText()));
 		String codeRef = Utils.getCodeRef(testStep);
+		rq.setParameters(Utils.getParameters(codeRef, testStep.getDefinitionArgument()));
 		rq.setCodeRef(codeRef);
 		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
 		rq.setAttributes(Utils.getAttributes(testStep));
