@@ -33,8 +33,6 @@ import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
@@ -145,18 +143,8 @@ public class Utils {
 		return rp.startTestItem(rootItemId, rq);
 	}
 
-	public static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog(item -> {
-			SaveLogRQ rq = new SaveLogRQ();
-			rq.setMessage(message);
-			rq.setItemUuid(item);
-			rq.setLevel(level);
-			rq.setLogTime(Calendar.getInstance().getTime());
-			if (file != null) {
-				rq.setFile(file);
-			}
-			return rq;
-		});
+	static void sendLog(final String message, final String level) {
+		ReportPortal.emitLog(message, level, Calendar.getInstance().getTime());
 	}
 
 	/**
