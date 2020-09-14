@@ -19,6 +19,7 @@ import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.message.ReportPortalMessage;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
+import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
@@ -30,6 +31,7 @@ import cucumber.api.TestCase;
 import cucumber.api.TestStep;
 import cucumber.api.event.*;
 import cucumber.api.formatter.Formatter;
+import gherkin.ast.Step;
 import io.reactivex.Maybe;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.tika.Tika;
@@ -42,16 +44,15 @@ import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
 import rp.com.google.common.io.ByteSource;
 
+import javax.annotation.Nonnull;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.epam.reportportal.cucumber.Utils.getCodeRef;
 import static com.epam.reportportal.cucumber.Utils.getDescription;
+import static java.util.Optional.ofNullable;
 import static rp.com.google.common.base.Strings.isNullOrEmpty;
 
 /**
@@ -83,6 +84,10 @@ public abstract class AbstractReporter implements Formatter {
 	// This map is used to record the last scenario time and its feature uri.
 	// End of feature occurs once launch is finished.
 	private final Map<String, Date> featureEndTime = new ConcurrentHashMap<>();
+
+	protected RunningContext.ScenarioContext getCurrentScenarioContext() {
+		return currentScenarioContext.get();
+	}
 
 	/**
 	 * Registers an event handler for a specific event.
@@ -213,32 +218,91 @@ public abstract class AbstractReporter implements Formatter {
 	}
 
 	/**
+	 * Extension point to customize test creation event/request
+	 *
+	 * @param testStep a cucumber step object
+	 * @return Request to ReportPortal
+	 */
+	protected StartTestItemRQ buildStartStepRequest(TestStep testStep, String stepPrefix, String keyword) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setName(Utils.buildNodeName(stepPrefix, keyword, testStep.getStepText(), ""));
+		rq.setDescription(Utils.buildMultilineArgument(testStep));
+		rq.setStartTime(Calendar.getInstance().getTime());
+		rq.setType("STEP");
+		String codeRef = Utils.getCodeRef(testStep);
+		rq.setParameters(Utils.getParameters(codeRef, testStep.getDefinitionArgument()));
+		rq.setCodeRef(codeRef);
+		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
+		rq.setAttributes(Utils.getAttributes(testStep));
+		return rq;
+	}
+
+	/**
 	 * Start Cucumber step
 	 *
-	 * @param step Step object
+	 * @param testStep a cucumber step object
 	 */
-	protected abstract void beforeStep(TestStep step);
+	protected void beforeStep(TestStep testStep) {
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Step step = context.getStep(testStep);
+		StartTestItemRQ rq = buildStartStepRequest(testStep, context.getStepPrefix(), step.getKeyword());
+		context.setCurrentStepId(launch.get().startTestItem(context.getId(), rq));
+	}
 
 	/**
 	 * Finish Cucumber step
 	 *
 	 * @param result Step result
 	 */
-	protected abstract void afterStep(Result result);
+	protected void afterStep(Result result) {
+		reportResult(result, null);
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Launch myLaunch = launch.get();
+		myLaunch.getStepReporter().finishPreviousStep();
+		Utils.finishTestItem(myLaunch, context.getCurrentStepId(), result.getStatus());
+		context.setCurrentStepId(null);
+	}
+
+	/**
+	 * Extension point to customize test creation event/request
+	 *
+	 * @param hookType a cucumber hook type object
+	 * @return Request to ReportPortal
+	 */
+	protected StartTestItemRQ buildStartHookRequest(HookType hookType) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		Pair<String, String> typeName = Utils.getHookTypeAndName(hookType);
+		rq.setType(typeName.getKey());
+		rq.setName(typeName.getValue());
+		rq.setStartTime(Calendar.getInstance().getTime());
+		return rq;
+	}
 
 	/**
 	 * Called when before/after-hooks are started
 	 *
-	 * @param isBefore - if true, before-hook is started, if false - after-hook
+	 * @param hookType - if true, before-hook is started, if false - after-hook
 	 */
-	protected abstract void beforeHooks(Boolean isBefore);
+	protected void beforeHooks(HookType hookType) {
+		StartTestItemRQ rq = buildStartHookRequest(hookType);
+
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		context.setHookStepId(launch.get().startTestItem(context.getId(), rq));
+		context.setHookStatus(Result.Type.PASSED);
+	}
 
 	/**
 	 * Called when before/after-hooks are finished
 	 *
-	 * @param isBefore - if true, before-hook is finished, if false - after-hook
+	 * @param hookType a hook type
 	 */
-	protected abstract void afterHooks(Boolean isBefore);
+	protected void afterHooks(HookType hookType) {
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		Launch myLaunch = launch.get();
+		myLaunch.getStepReporter().finishPreviousStep();
+		Utils.finishTestItem(myLaunch, context.getHookStepId(), context.getHookStatus());
+		context.setHookStepId(null);
+	}
 
 	/**
 	 * Called when a specific before/after-hook is finished
@@ -247,13 +311,18 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param result   Hook result
 	 * @param isBefore - if true, before-hook, if false - after-hook
 	 */
-	protected abstract void hookFinished(TestStep step, Result result, Boolean isBefore);
+	protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
+		reportResult(result, (isBefore ? "Before" : "After") + " hook: " + step.getCodeLocation());
+		RunningContext.ScenarioContext context = getCurrentScenarioContext();
+		context.setHookStatus(result.getStatus());
+	}
 
 	/**
 	 * Return RP test item name mapped to Cucumber feature
 	 *
 	 * @return test item name
 	 */
+	@Nonnull
 	protected abstract String getFeatureTestItemType();
 
 	/**
@@ -261,6 +330,7 @@ public abstract class AbstractReporter implements Formatter {
 	 *
 	 * @return test item name
 	 */
+	@Nonnull
 	protected abstract String getScenarioTestItemType();
 
 	/**
@@ -321,29 +391,26 @@ public abstract class AbstractReporter implements Formatter {
 		Utils.sendLog(text, "INFO");
 	}
 
-	protected boolean isBefore(TestStep step) {
-		return "Before".equals(step.getHookType().name());
+	private boolean isBefore(TestStep step) {
+		return HookType.Before == step.getHookType();
 	}
 
-	protected abstract Maybe<String> getRootItemId();
-
-	protected RunningContext.ScenarioContext getCurrentScenarioContext() {
-		return currentScenarioContext.get();
-	}
+	@Nonnull
+	protected abstract Optional<Maybe<String>> getRootItemId();
 
 	private RunningContext.FeatureContext startFeatureContext(RunningContext.FeatureContext context) {
 		String featureKeyword = context.getFeature().getKeyword();
 		String featureName = context.getFeature().getName();
 
 		StartTestItemRQ rq = new StartTestItemRQ();
-		Maybe<String> root = getRootItemId();
 		rq.setDescription(getDescription(context.getUri()));
 		rq.setCodeRef(getCodeRef(context.getUri(), 0));
 		rq.setName(Utils.buildNodeName(featureKeyword, AbstractReporter.COLON_INFIX, featureName, null));
 		rq.setAttributes(context.getAttributes());
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(getFeatureTestItemType());
-		context.setFeatureId(root == null ? launch.get().startTestItem(rq) : launch.get().startTestItem(root, rq));
+		Optional<Maybe<String>> root = getRootItemId();
+		context.setFeatureId(root.map(r -> launch.get().startTestItem(r, rq)).orElseGet(() -> launch.get().startTestItem(rq)));
 		return context;
 	}
 
@@ -431,7 +498,7 @@ public abstract class AbstractReporter implements Formatter {
 	private void handleTestStepStarted(TestStepStarted event) {
 		TestStep testStep = event.testStep;
 		if (testStep.isHook()) {
-			beforeHooks(HookType.Before == testStep.getHookType());
+			beforeHooks(testStep.getHookType());
 		} else {
 			if (getCurrentScenarioContext().withBackground()) {
 				getCurrentScenarioContext().nextBackgroundStep();
@@ -442,8 +509,9 @@ public abstract class AbstractReporter implements Formatter {
 
 	private void handleTestStepFinished(TestStepFinished event) {
 		if (event.testStep.isHook()) {
+
 			hookFinished(event.testStep, event.result, isBefore(event.testStep));
-			afterHooks(isBefore(event.testStep));
+			afterHooks(event.testStep.getHookType());
 		} else {
 			afterStep(event.result);
 		}

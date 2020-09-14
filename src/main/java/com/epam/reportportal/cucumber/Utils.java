@@ -28,6 +28,7 @@ import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
+import cucumber.api.HookType;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
@@ -359,18 +360,19 @@ public class Utils {
 		return uri;
 	}
 
-	public static StartTestItemRQ buildStartStepRequest(String stepPrefix, TestStep testStep, Step step, boolean hasStats) {
-		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setName(Utils.buildNodeName(stepPrefix, step.getKeyword(), testStep.getStepText(), ""));
-		rq.setDescription(Utils.buildMultilineArgument(testStep));
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType("STEP");
-		rq.setHasStats(hasStats);
-		String codeRef = Utils.getCodeRef(testStep);
-		rq.setParameters(Utils.getParameters(codeRef, testStep.getDefinitionArgument()));
-		rq.setCodeRef(codeRef);
-		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
-		rq.setAttributes(Utils.getAttributes(testStep));
-		return rq;
+	public static Pair<String, String> getHookTypeAndName(HookType hookType) {
+		String name = null;
+		String type = null;
+		switch (hookType) {
+			case Before:
+				name = "Before hooks";
+				type = "BEFORE_TEST";
+				break;
+			case After:
+				name = "After hooks";
+				type = "AFTER_TEST";
+				break;
+		}
+		return Pair.of(type, name);
 	}
 }
