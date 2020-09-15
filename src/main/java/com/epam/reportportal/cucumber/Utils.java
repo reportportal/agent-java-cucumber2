@@ -1,22 +1,17 @@
 /*
- * Copyright 2016 EPAM Systems
+ *  Copyright 2020 EPAM Systems
  *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- * This file is part of EPAM Report Portal.
- * https://github.com/reportportal/agent-java-cucumber
+ *  http://www.apache.org/licenses/LICENSE-2.0
  *
- * Report Portal is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Report Portal is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Report Portal.  If not, see <http://www.gnu.org/licenses/>.
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 package com.epam.reportportal.cucumber;
 
@@ -27,33 +22,30 @@ import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.utils.AttributeParser;
+import com.epam.reportportal.utils.ParameterUtils;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ.File;
+import cucumber.api.HookType;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
-import gherkin.ast.Step;
 import gherkin.ast.Tag;
 import gherkin.pickles.*;
 import io.reactivex.Maybe;
 import io.reactivex.annotations.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rp.com.google.common.collect.ImmutableMap;
-import rp.com.google.common.collect.Lists;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -68,7 +60,6 @@ public class Utils {
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
 	private static final String METHOD_FIELD_NAME = "method";
-	private static final String PARAMETER_REGEX = "<[^<>]+>";
 
 	private Utils() {
 	}
@@ -141,24 +132,14 @@ public class Utils {
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(type);
 		if ("STEP".equals(type)) {
-			rq.setTestCaseId(TestCaseIdUtils.getTestCaseId(codeRef, null).getId());
+			rq.setTestCaseId(ofNullable(Utils.getTestCaseId(codeRef, null)).map(TestCaseIdEntry::getId).orElse(null));
 		}
 
 		return rp.startTestItem(rootItemId, rq);
 	}
 
-	public static void sendLog(final String message, final String level, final File file) {
-		ReportPortal.emitLog(item -> {
-			SaveLogRQ rq = new SaveLogRQ();
-			rq.setMessage(message);
-			rq.setItemUuid(item);
-			rq.setLevel(level);
-			rq.setLogTime(Calendar.getInstance().getTime());
-			if (file != null) {
-				rq.setFile(file);
-			}
-			return rq;
-		});
+	static void sendLog(final String message, final String level) {
+		ReportPortal.emitLog(message, level, Calendar.getInstance().getTime());
 	}
 
 	/**
@@ -211,16 +192,10 @@ public class Utils {
 	 * @param prefix   - substring to be prepended at the beginning (optional)
 	 * @param infix    - substring to be inserted between keyword and name
 	 * @param argument - main text to process
-	 * @param suffix   - substring to be appended at the end (optional)
 	 * @return transformed string
 	 */
-	//TODO: pass Node as argument, not test event
-	public static String buildNodeName(String prefix, String infix, String argument, String suffix) {
-		return buildName(prefix, infix, argument, suffix);
-	}
-
-	private static String buildName(String prefix, String infix, String argument, String suffix) {
-		return (prefix == null ? "" : prefix) + infix + argument + (suffix == null ? "" : suffix);
+	public static String buildName(String prefix, String infix, String argument) {
+		return (prefix == null ? "" : prefix) + infix + argument;
 	}
 
 	/**
@@ -258,17 +233,6 @@ public class Utils {
 			marg.append(DOCSTRING_DECORATOR).append(dockString).append(DOCSTRING_DECORATOR);
 		}
 		return marg.toString();
-	}
-
-	static String getStepName(TestStep step) {
-		String stepName;
-		if (step.isHook()) {
-			stepName = "Hook: " + step.getHookType().toString();
-		} else {
-			stepName = step.getPickleStep().getText();
-		}
-
-		return stepName;
 	}
 
 	@Nullable
@@ -313,24 +277,16 @@ public class Utils {
 		}
 	}
 
-	static List<ParameterResource> getParameters(List<cucumber.runtime.Argument> arguments, String text) {
-		List<ParameterResource> parameters = Lists.newArrayList();
-		List<String> parameterNames = Lists.newArrayList();
-		Matcher matcher = Pattern.compile(PARAMETER_REGEX).matcher(text);
-		while (matcher.find()) {
-			parameterNames.add(text.substring(matcher.start() + 1, matcher.end() - 1));
-		}
-		IntStream.range(0, parameterNames.size()).forEach(index -> {
-			String key = parameterNames.get(index);
-			if (index < arguments.size()) {
-				String val = arguments.get(index).getVal();
-				ParameterResource parameterResource = new ParameterResource();
-				parameterResource.setKey(key);
-				parameterResource.setValue(val);
-				parameters.add(parameterResource);
-			}
-		});
-		return parameters;
+	@Nonnull
+	public static String getCodeRef(@Nonnull String uri, int line) {
+		return uri + ":" + line;
+	}
+
+	static List<ParameterResource> getParameters(String codeRef, List<cucumber.runtime.Argument> arguments) {
+		List<Pair<String, String>> params = ofNullable(arguments).map(a -> IntStream.range(0, a.size())
+				.mapToObj(i -> Pair.of("arg" + i, a.get(i).getVal()))
+				.collect(Collectors.toList())).orElse(null);
+		return ParameterUtils.getParameters(codeRef, params);
 	}
 
 	private static Method retrieveMethod(Field definitionMatchField, TestStep testStep)
@@ -397,23 +353,19 @@ public class Utils {
 		return uri;
 	}
 
-	@Nonnull
-	public static String getCodeRef(@Nonnull String uri, int line) {
-		return uri + ":" + line;
-	}
-
-	public static StartTestItemRQ buildStartStepRequest(String stepPrefix, TestStep testStep, Step step, boolean hasStats) {
-		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setName(Utils.buildNodeName(stepPrefix, step.getKeyword(), testStep.getStepText(), ""));
-		rq.setDescription(Utils.buildMultilineArgument(testStep));
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType("STEP");
-		rq.setHasStats(hasStats);
-		rq.setParameters(Utils.getParameters(testStep.getDefinitionArgument(), step.getText()));
-		String codeRef = Utils.getCodeRef(testStep);
-		rq.setCodeRef(codeRef);
-		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
-		rq.setAttributes(Utils.getAttributes(testStep));
-		return rq;
+	public static Pair<String, String> getHookTypeAndName(HookType hookType) {
+		String name = null;
+		String type = null;
+		switch (hookType) {
+			case Before:
+				name = "Before hooks";
+				type = "BEFORE_TEST";
+				break;
+			case After:
+				name = "After hooks";
+				type = "AFTER_TEST";
+				break;
+		}
+		return Pair.of(type, name);
 	}
 }

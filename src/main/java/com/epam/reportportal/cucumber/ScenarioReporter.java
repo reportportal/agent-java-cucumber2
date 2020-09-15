@@ -1,35 +1,30 @@
 /*
- * Copyright 2016 EPAM Systems
+ *  Copyright 2020 EPAM Systems
  *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- * This file is part of EPAM Report Portal.
- * https://github.com/reportportal/agent-java-cucumber
+ *  http://www.apache.org/licenses/LICENSE-2.0
  *
- * Report Portal is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Report Portal is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Report Portal.  If not, see <http://www.gnu.org/licenses/>.
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 package com.epam.reportportal.cucumber;
 
-import com.epam.reportportal.service.Launch;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
-import cucumber.api.Result;
+import cucumber.api.HookType;
 import cucumber.api.TestStep;
-import gherkin.ast.Step;
 import io.reactivex.Maybe;
 import rp.com.google.common.base.Supplier;
 import rp.com.google.common.base.Suppliers;
 
+import javax.annotation.Nonnull;
 import java.util.Calendar;
+import java.util.Optional;
 
 /**
  * Cucumber reporter for ReportPortal that reports scenarios as test methods.
@@ -65,64 +60,35 @@ public class ScenarioReporter extends AbstractReporter {
 	}
 
 	@Override
-	protected void beforeStep(TestStep testStep) {
-		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		Step step = context.getStep(testStep);
-		StartTestItemRQ rq = Utils.buildStartStepRequest(context.getStepPrefix(), testStep, step, true);
+	protected StartTestItemRQ buildStartStepRequest(TestStep testStep, String stepPrefix, String keyword) {
+		StartTestItemRQ rq = super.buildStartStepRequest(testStep, stepPrefix, keyword);
 		rq.setHasStats(false);
-		context.setCurrentStepId(launch.get().startTestItem(context.getId(), rq));
+		return rq;
 	}
 
 	@Override
-	protected void afterStep(Result result) {
-		reportResult(result, null);
-		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		Launch myLaunch = launch.get();
-		Utils.finishTestItem(myLaunch, context.getCurrentStepId(), result.getStatus());
-		context.setCurrentStepId(null);
-		myLaunch.getStepReporter().finishPreviousStep();
-	}
-
-	@Override
-	protected void beforeHooks(Boolean isBefore) {
-		StartTestItemRQ rq = new StartTestItemRQ();
+	protected StartTestItemRQ buildStartHookRequest(HookType hookType) {
+		StartTestItemRQ rq = super.buildStartHookRequest(hookType);
 		rq.setHasStats(false);
-		rq.setName(isBefore ? "Before hooks" : "After hooks");
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType(isBefore ? "BEFORE_TEST" : "AFTER_TEST");
-
-		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		context.setHookStepId(launch.get().startTestItem(context.getId(), rq));
-		context.setHookStatus(Result.Type.PASSED);
+		return rq;
 	}
 
 	@Override
-	protected void afterHooks(Boolean isBefore) {
-		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		Launch myLaunch = launch.get();
-		Utils.finishTestItem(myLaunch, context.getHookStepId(), context.getHookStatus());
-		context.setHookStepId(null);
-		myLaunch.getStepReporter().finishPreviousStep();
-	}
-
-	@Override
-	protected void hookFinished(TestStep step, Result result, Boolean isBefore) {
-		reportResult(result, (isBefore ? "@Before" : "@After") + "\n" + step.getCodeLocation());
-	}
-
-	@Override
+	@Nonnull
 	protected String getFeatureTestItemType() {
 		return RP_TEST_TYPE;
 	}
 
 	@Override
+	@Nonnull
 	protected String getScenarioTestItemType() {
 		return RP_STEP_TYPE;
 	}
 
 	@Override
-	protected Maybe<String> getRootItemId() {
-		return rootSuiteId.get();
+	@Nonnull
+	protected Optional<Maybe<String>> getRootItemId() {
+		return Optional.of(rootSuiteId.get());
 	}
 
 	@Override
