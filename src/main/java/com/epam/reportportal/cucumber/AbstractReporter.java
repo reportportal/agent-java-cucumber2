@@ -285,7 +285,7 @@ public abstract class AbstractReporter implements Formatter {
 		context.setCurrentText(stepText);
 
 		if (myLaunch.getParameters().isCallbackReportingEnabled()) {
-			addToTree(context, step.getText(), stepId);
+			addToTree(context, stepText, stepId);
 		}
 	}
 
