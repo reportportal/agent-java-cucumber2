@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Docstring parameter handling
 
 ## [5.0.0-RC-1]
 ### Added

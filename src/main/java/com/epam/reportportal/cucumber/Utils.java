@@ -22,10 +22,8 @@ import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.utils.AttributeParser;
-import com.epam.reportportal.utils.ParameterUtils;
 import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
-import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import cucumber.api.HookType;
@@ -47,7 +45,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static java.util.Optional.ofNullable;
 
@@ -280,13 +277,6 @@ public class Utils {
 	@Nonnull
 	public static String getCodeRef(@Nonnull String uri, int line) {
 		return uri + ":" + line;
-	}
-
-	static List<ParameterResource> getParameters(String codeRef, List<cucumber.runtime.Argument> arguments) {
-		List<Pair<String, String>> params = ofNullable(arguments).map(a -> IntStream.range(0, a.size())
-				.mapToObj(i -> Pair.of("arg" + i, a.get(i).getVal()))
-				.collect(Collectors.toList())).orElse(null);
-		return ParameterUtils.getParameters(codeRef, params);
 	}
 
 	private static Method retrieveMethod(Field definitionMatchField, TestStep testStep)
