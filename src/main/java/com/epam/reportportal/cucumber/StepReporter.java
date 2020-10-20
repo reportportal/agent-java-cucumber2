@@ -15,16 +15,9 @@
  */
 package com.epam.reportportal.cucumber;
 
-import com.epam.reportportal.service.Launch;
-import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
-import cucumber.api.HookType;
-import cucumber.api.Result;
-import cucumber.api.TestStep;
-import gherkin.ast.Step;
 import io.reactivex.Maybe;
 
 import javax.annotation.Nonnull;
-import java.util.Calendar;
 import java.util.Optional;
 
 /**
