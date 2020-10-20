@@ -7,13 +7,6 @@
 - Many static methods from Util class were moved to AbstractReporter class and made protected to ease extension
 - Client version updated 
 
-## [5.0.0-RC-2]
-### Added
-- Docstring parameter handling
-### Changed
-- Many static methods from Util class were moved to AbstractReporter class and made protected to ease extension
-- Client version updated 
-
 ## [5.0.0-RC-1]
 ### Added
 - Callback reporting
