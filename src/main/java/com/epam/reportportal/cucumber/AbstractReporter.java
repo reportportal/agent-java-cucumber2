@@ -15,14 +15,22 @@
  */
 package com.epam.reportportal.cucumber;
 
+import com.epam.reportportal.annotations.TestCaseId;
+import com.epam.reportportal.annotations.attribute.Attributes;
+import com.epam.reportportal.listeners.ItemStatus;
 import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.message.ReportPortalMessage;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.service.tree.TestItemTree;
+import com.epam.reportportal.utils.AttributeParser;
+import com.epam.reportportal.utils.ParameterUtils;
+import com.epam.reportportal.utils.TestCaseIdUtils;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
+import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
+import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
@@ -32,7 +40,11 @@ import cucumber.api.TestCase;
 import cucumber.api.TestStep;
 import cucumber.api.event.*;
 import cucumber.api.formatter.Formatter;
+import cucumber.runtime.StepDefinitionMatch;
+import gherkin.ast.Feature;
 import gherkin.ast.Step;
+import gherkin.ast.Tag;
+import gherkin.pickles.*;
 import io.reactivex.Maybe;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.tika.Tika;
@@ -46,16 +58,18 @@ import rp.com.google.common.base.Suppliers;
 import rp.com.google.common.io.ByteSource;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Map;
-import java.util.Optional;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
-import static com.epam.reportportal.cucumber.Utils.getCodeRef;
-import static com.epam.reportportal.cucumber.Utils.getDescription;
+import static com.epam.reportportal.cucumber.Utils.*;
 import static com.epam.reportportal.cucumber.util.ItemTreeUtils.createKey;
 import static com.epam.reportportal.cucumber.util.ItemTreeUtils.retrieveLeaf;
 import static java.util.Optional.ofNullable;
@@ -75,6 +89,11 @@ public abstract class AbstractReporter implements Formatter {
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
 	private static final int DEFAULT_CAPACITY = 16;
+	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
+	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
+	private static final String METHOD_OPENING_BRACKET = "(";
+	private static final String TABLE_SEPARATOR = "|";
+	private static final String DOCSTRING_DECORATOR = "\n\"\"\"\n";
 
 	public static final TestItemTree ITEM_TREE = new TestItemTree();
 	private static volatile ReportPortal REPORT_PORTAL = ReportPortal.builder().build();
@@ -168,20 +187,41 @@ public abstract class AbstractReporter implements Formatter {
 	}
 
 	/**
-	 * Start Cucumber scenario
+	 * Extension point to customize scenario creation event/request
+	 *
+	 * @param testCase Cucumber's TestCase object
+	 * @param name     the scenario name
+	 * @param uri      the scenario feature file relative path
+	 * @param line     the scenario text line number
+	 * @return start test item request ready to send on RP
 	 */
-	protected void beforeScenario(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext,
-			String scenarioName) {
-		String description = getDescription(featureContext.getUri());
-		String codeRef = getCodeRef(featureContext.getUri(), scenarioContext.getLine());
+	protected StartTestItemRQ buildStartScenarioRequest(TestCase testCase, String name, String uri, int line) {
+		StartTestItemRQ rq = new StartTestItemRQ();
+		rq.setName(name);
+		rq.setDescription(getDescription(testCase, uri));
+		String codeRef = getCodeRef(uri, line);
+		rq.setCodeRef(codeRef);
+		rq.setAttributes(extractPickleTags(testCase.getTags()));
+		rq.setStartTime(Calendar.getInstance().getTime());
+		String type = getScenarioTestItemType();
+		rq.setType(type);
+		if ("STEP".equals(type)) {
+			rq.setTestCaseId(ofNullable(getTestCaseId(codeRef, null)).map(TestCaseIdEntry::getId).orElse(null));
+		}
+		return rq;
+	}
+
+	/**
+	 * Start Cucumber scenario
+	 *
+	 * @param featureContext  current feature context
+	 * @param scenarioContext current scenario context
+	 */
+	protected void beforeScenario(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
+		String scenarioName = buildName(scenarioContext.getKeyword(), AbstractReporter.COLON_INFIX, scenarioContext.getName());
 		Launch myLaunch = launch.get();
-		Maybe<String> id = Utils.startNonLeafNode(myLaunch,
-				featureContext.getFeatureId(),
-				scenarioName,
-				description,
-				codeRef,
-				scenarioContext.getAttributes(),
-				getScenarioTestItemType()
+		Maybe<String> id = myLaunch.startTestItem(featureContext.getFeatureId(),
+				buildStartScenarioRequest(scenarioContext.getTestCase(), scenarioName, featureContext.getUri(), scenarioContext.getLine())
 		);
 		scenarioContext.setId(id);
 		if (myLaunch.getParameters().isCallbackReportingEnabled()) {
@@ -197,12 +237,14 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Finish Cucumber scenario
 	 * Put scenario end time in a map to check last scenario end time per feature
+	 *
+	 * @param event Cucumber's TestCaseFinished object
 	 */
 	protected void afterScenario(TestCaseFinished event) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
 		String featureUri = context.getFeatureUri();
 		currentScenarioContextMap.remove(Pair.of(context.getLine(), featureUri));
-		Date endTime = Utils.finishTestItem(launch.get(), context.getId(), event.result.getStatus());
+		Date endTime = finishTestItem(context.getId(), event.result.getStatus());
 		featureEndTime.put(featureUri, endTime);
 		currentScenarioContext.set(null);
 		removeFromTree(currentFeatureContextMap.get(context.getFeatureUri()), context);
@@ -251,21 +293,30 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Extension point to customize test creation event/request
 	 *
-	 * @param testStep a cucumber step object
+	 * @param testStep   a cucumber step object
+	 * @param stepPrefix a prefix of the step (e.g. 'Background')
+	 * @param keyword    a step keyword (e.g. 'Given')
 	 * @return Request to ReportPortal
 	 */
 	protected StartTestItemRQ buildStartStepRequest(TestStep testStep, String stepPrefix, String keyword) {
 		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setName(Utils.buildName(stepPrefix, keyword, testStep.getStepText()));
-		rq.setDescription(Utils.buildMultilineArgument(testStep));
+		rq.setName(buildName(stepPrefix, keyword, testStep.getStepText()));
+		rq.setDescription(buildMultilineArgument(testStep));
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType("STEP");
-		String codeRef = Utils.getCodeRef(testStep);
-		rq.setParameters(Utils.getParameters(codeRef, testStep.getDefinitionArgument()));
+		String codeRef = getCodeRef(testStep);
+		rq.setParameters(getParameters(codeRef, testStep));
 		rq.setCodeRef(codeRef);
-		rq.setTestCaseId(ofNullable(Utils.getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
-		rq.setAttributes(Utils.getAttributes(testStep));
+		rq.setTestCaseId(ofNullable(getTestCaseId(testStep, codeRef)).map(TestCaseIdEntry::getId).orElse(null));
+		rq.setAttributes(getAttributes(testStep));
 		return rq;
+	}
+
+	private void addToTree(RunningContext.ScenarioContext scenarioContext, String text, Maybe<String> stepId) {
+		retrieveLeaf(scenarioContext.getFeatureUri(),
+				scenarioContext.getLine(),
+				ITEM_TREE
+		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId, 0)));
 	}
 
 	/**
@@ -296,9 +347,8 @@ public abstract class AbstractReporter implements Formatter {
 	protected void afterStep(Result result) {
 		reportResult(result, null);
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		Launch myLaunch = launch.get();
-		myLaunch.getStepReporter().finishPreviousStep();
-		Utils.finishTestItem(myLaunch, context.getCurrentStepId(), result.getStatus());
+		launch.get().getStepReporter().finishPreviousStep();
+		finishTestItem(context.getCurrentStepId(), result.getStatus());
 		context.setCurrentStepId(null);
 		context.setCurrentText(null);
 	}
@@ -311,7 +361,7 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	protected StartTestItemRQ buildStartHookRequest(HookType hookType) {
 		StartTestItemRQ rq = new StartTestItemRQ();
-		Pair<String, String> typeName = Utils.getHookTypeAndName(hookType);
+		Pair<String, String> typeName = getHookTypeAndName(hookType);
 		rq.setType(typeName.getKey());
 		rq.setName(typeName.getValue());
 		rq.setStartTime(Calendar.getInstance().getTime());
@@ -338,9 +388,8 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	protected void afterHooks(HookType hookType) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		Launch myLaunch = launch.get();
-		myLaunch.getStepReporter().finishPreviousStep();
-		Utils.finishTestItem(myLaunch, context.getHookStepId(), context.getHookStatus());
+		launch.get().getStepReporter().finishPreviousStep();
+		finishTestItem(context.getHookStepId(), context.getHookStatus());
 		context.setHookStepId(null);
 	}
 
@@ -379,17 +428,17 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param message - optional message to be logged in addition
 	 */
 	protected void reportResult(Result result, String message) {
-		String cukesStatus = result.getStatus().toString();
-		String level = Utils.mapLevel(cukesStatus);
+		Result.Type cukesStatus = result.getStatus();
+		String level = mapLevel(cukesStatus);
 		if (message != null) {
-			Utils.sendLog(message, level);
+			sendLog(message, level);
 		}
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
-			Utils.sendLog(errorMessage, level);
+			sendLog(errorMessage, level);
 		}
 		if (result.getError() != null) {
-			Utils.sendLog(getStackTraceAsString(result.getError()), level);
+			sendLog(getStackTraceAsString(result.getError()), level);
 		}
 	}
 
@@ -428,8 +477,34 @@ public abstract class AbstractReporter implements Formatter {
 		ReportPortal.emitLog(new ReportPortalMessage(ByteSource.wrap(data), type, prefix), "UNKNOWN", Calendar.getInstance().getTime());
 	}
 
+	/**
+	 * Send a log entry to Report Portal with 'INFO' level.
+	 *
+	 * @param text a log text to send
+	 * @deprecated use {@link #sendLog(String)}
+	 */
+	@Deprecated
 	protected void write(String text) {
-		Utils.sendLog(text, "INFO");
+		sendLog(text, "INFO");
+	}
+
+	/**
+	 * Send a text log entry to Report Portal with 'INFO' level, using current datetime as timestamp
+	 *
+	 * @param message a text message
+	 */
+	protected void sendLog(String message) {
+		sendLog(message, "INFO");
+	}
+
+	/**
+	 * Send a text log entry to Report Portal using current datetime as timestamp
+	 *
+	 * @param message a text message
+	 * @param level   a log level, see standard Log4j / logback logging levels
+	 */
+	protected void sendLog(final String message, final String level) {
+		ReportPortal.emitLog(message, level, Calendar.getInstance().getTime());
 	}
 
 	private boolean isBefore(TestStep step) {
@@ -443,20 +518,16 @@ public abstract class AbstractReporter implements Formatter {
 		String featureKeyword = context.getFeature().getKeyword();
 		String featureName = context.getFeature().getName();
 		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setDescription(getDescription(context.getUri()));
+		rq.setDescription(getDescription(context.getFeature(), context.getUri()));
 		rq.setCodeRef(getCodeRef(context.getUri(), 0));
-		rq.setName(Utils.buildName(featureKeyword, AbstractReporter.COLON_INFIX, featureName));
-		rq.setAttributes(context.getAttributes());
+		rq.setName(buildName(featureKeyword, AbstractReporter.COLON_INFIX, featureName));
+		rq.setAttributes(extractAttributes(context.getFeature().getTags()));
 		rq.setStartTime(Calendar.getInstance().getTime());
 		rq.setType(getFeatureTestItemType());
 		Optional<Maybe<String>> root = getRootItemId();
 		context.setFeatureId(root.map(r -> launch.get().startTestItem(r, rq)).orElseGet(() -> launch.get().startTestItem(rq)));
 		return context;
 	}
-
-	/**
-	 * Private part that responsible for handling events
-	 */
 
 	protected EventHandler<TestRunStarted> getTestRunStartedHandler() {
 		return event -> beforeLaunch();
@@ -494,7 +565,7 @@ public abstract class AbstractReporter implements Formatter {
 	}
 
 	protected EventHandler<WriteEvent> getWriteEventHandler() {
-		return event -> write(event.text);
+		return event -> sendLog(event.text);
 	}
 
 	private void removeFromTree(RunningContext.FeatureContext featureContext) {
@@ -504,7 +575,7 @@ public abstract class AbstractReporter implements Formatter {
 	protected void handleEndOfFeature() {
 		currentFeatureContextMap.values().forEach(f -> {
 			Date featureCompletionDateTime = featureEndTime.get(f.getUri());
-			Utils.finishFeature(launch.get(), f.getFeatureId(), featureCompletionDateTime);
+			finishFeature(f.getFeatureId(), featureCompletionDateTime);
 			removeFromTree(f);
 		});
 		currentFeatureContextMap.clear();
@@ -532,15 +603,13 @@ public abstract class AbstractReporter implements Formatter {
 		}
 
 		RunningContext.ScenarioContext newScenarioContext = featureContext.getScenarioContext(testCase);
-		String scenarioName = Utils.buildName(newScenarioContext.getKeyword(), AbstractReporter.COLON_INFIX, newScenarioContext.getName());
-
 		Pair<Integer, String> scenarioLineFeatureURI = Pair.of(newScenarioContext.getLine(), featureContext.getUri());
 		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.computeIfAbsent(scenarioLineFeatureURI, k -> {
 			currentScenarioContext.set(newScenarioContext);
 			return newScenarioContext;
 		});
 
-		beforeScenario(featureContext, scenarioContext, scenarioName);
+		beforeScenario(featureContext, scenarioContext);
 	}
 
 	protected void handleTestStepStarted(TestStepStarted event) {
@@ -564,17 +633,302 @@ public abstract class AbstractReporter implements Formatter {
 		}
 	}
 
-	protected void addToTree(RunningContext.ScenarioContext scenarioContext, String text, Maybe<String> stepId) {
-		retrieveLeaf(scenarioContext.getFeatureUri(),
-				scenarioContext.getLine(),
-				ITEM_TREE
-		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId, 0)));
+	/**
+	 * Finish a feature with specific date and time
+	 *
+	 * @param itemId   an ID of the item
+	 * @param dateTime a date and time object to use as feature end time
+	 */
+	protected void finishFeature(Maybe<String> itemId, Date dateTime) {
+		if (itemId == null) {
+			LOGGER.error("BUG: Trying to finish unspecified test item.");
+			return;
+		}
+		FinishTestItemRQ rq = new FinishTestItemRQ();
+		rq.setEndTime(dateTime);
+		launch.get().finishTestItem(itemId, rq);
 	}
 
-	protected void removeFromTree(RunningContext.ScenarioContext scenarioContext, String text) {
-		retrieveLeaf(scenarioContext.getFeatureUri(),
-				scenarioContext.getLine(),
-				ITEM_TREE
-		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().remove(createKey(text)));
+	/**
+	 * Finish a test item with no specific status
+	 *
+	 * @param itemId an ID of the item
+	 */
+	protected void finishTestItem(Maybe<String> itemId) {
+		finishTestItem(itemId, null);
+	}
+
+	/**
+	 * Finish a test item with specified status
+	 *
+	 * @param itemId an ID of the item
+	 * @param status the status of the item
+	 * @return a date and time object of the finish event
+	 */
+	protected Date finishTestItem(Maybe<String> itemId, Result.Type status) {
+		if (itemId == null) {
+			LOGGER.error("BUG: Trying to finish unspecified test item.");
+			return null;
+		}
+
+		FinishTestItemRQ rq = new FinishTestItemRQ();
+		rq.setStatus(mapItemStatus(status));
+		Date currentDate = Calendar.getInstance().getTime();
+		rq.setEndTime(currentDate);
+		launch.get().finishTestItem(itemId, rq);
+		return currentDate;
+	}
+
+	/**
+	 * Map Cucumber statuses to RP item statuses
+	 *
+	 * @param status - Cucumber status
+	 * @return RP test item status and null if status is null
+	 */
+	protected String mapItemStatus(Result.Type status) {
+		if (status == null) {
+			return null;
+		} else {
+			if (STATUS_MAPPING.get(status) == null) {
+				LOGGER.error(String.format("Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
+						status
+				));
+				return ItemStatus.SKIPPED.name();
+			}
+			return STATUS_MAPPING.get(status).name();
+		}
+	}
+
+	/**
+	 * Map Cucumber statuses to RP log levels
+	 *
+	 * @param cukesStatus - Cucumber status
+	 * @return regular log level
+	 */
+	@Nonnull
+	protected String mapLevel(@Nullable Result.Type cukesStatus) {
+		if (cukesStatus == null) {
+			return "ERROR";
+		}
+		String level = LOG_LEVEL_MAPPING.get(cukesStatus);
+		return null == level ? "ERROR" : level;
+	}
+
+	/**
+	 * Generate multiline argument (DataTable or DocString) representation
+	 *
+	 * @param step - Cucumber's TestStep object
+	 * @return - transformed multiline argument (or empty string if there is none)
+	 */
+	protected String buildMultilineArgument(TestStep step) {
+		List<PickleRow> table = null;
+		String dockString = "";
+		StringBuilder marg = new StringBuilder();
+
+		if (!step.getStepArgument().isEmpty()) {
+			Argument argument = step.getStepArgument().get(0);
+			if (argument instanceof PickleString) {
+				dockString = ((PickleString) argument).getContent();
+			} else if (argument instanceof PickleTable) {
+				table = ((PickleTable) argument).getRows();
+			}
+		}
+		if (table != null) {
+			marg.append("\r\n");
+			for (PickleRow row : table) {
+				marg.append(TABLE_SEPARATOR);
+				for (PickleCell cell : row.getCells()) {
+					marg.append(" ").append(cell.getValue()).append(" ").append(TABLE_SEPARATOR);
+				}
+				marg.append("\r\n");
+			}
+		}
+
+		if (!dockString.isEmpty()) {
+			marg.append(DOCSTRING_DECORATOR).append(dockString).append(DOCSTRING_DECORATOR);
+		}
+		return marg.toString();
+	}
+
+	/**
+	 * Transform tags from Cucumber to RP format
+	 *
+	 * @param tags - Cucumber tags
+	 * @return set of attributes
+	 */
+	protected Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
+		Set<ItemAttributesRQ> attributes = new HashSet<>();
+		for (PickleTag tag : tags) {
+			attributes.add(new ItemAttributesRQ(null, tag.getName()));
+		}
+		return attributes;
+	}
+
+	/**
+	 * Transform tags from Cucumber to RP format
+	 *
+	 * @param tags - Cucumber tags
+	 * @return set of attributes
+	 */
+	protected Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
+		Set<ItemAttributesRQ> attributes = new HashSet<>();
+		for (Tag tag : tags) {
+			attributes.add(new ItemAttributesRQ(null, tag.getName()));
+		}
+		return attributes;
+	}
+
+	/**
+	 * Returns static attributes defined by {@link Attributes} annotation in code.
+	 *
+	 * @param testStep - Cucumber's TestStep object
+	 * @return a set of attributes or null if no such method provided by the match object
+	 */
+	@Nullable
+	protected Set<ItemAttributesRQ> getAttributes(@Nonnull TestStep testStep) {
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+		if (definitionMatchField != null) {
+			try {
+				Method method = retrieveMethod(definitionMatchField, testStep);
+				Attributes attributesAnnotation = method.getAnnotation(Attributes.class);
+				if (attributesAnnotation != null) {
+					return AttributeParser.retrieveAttributes(attributesAnnotation);
+				}
+			} catch (NoSuchFieldException | IllegalAccessException e) {
+				return null;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Returns code reference for mapped code
+	 *
+	 * @param testStep Cucumber's TestStep object
+	 * @return a code reference, or null if not possible to determine (ambiguous, undefined, etc.)
+	 */
+	@Nullable
+	protected String getCodeRef(TestStep testStep) {
+
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+
+		if (definitionMatchField != null) {
+
+			try {
+				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) definitionMatchField.get(testStep);
+				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
+				stepDefinitionField.setAccessible(true);
+				Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
+				Method getLocationMethod = javaStepDefinition.getClass().getDeclaredMethod(GET_LOCATION_METHOD_NAME, boolean.class);
+				getLocationMethod.setAccessible(true);
+				String fullCodeRef = String.valueOf(getLocationMethod.invoke(javaStepDefinition, true));
+				return fullCodeRef != null ? fullCodeRef.substring(0, fullCodeRef.indexOf(METHOD_OPENING_BRACKET)) : null;
+			} catch (NoSuchFieldException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+				return null;
+			}
+
+		} else {
+			return null;
+		}
+	}
+
+	/**
+	 * Returns code reference for feature files by URI and text line number
+	 *
+	 * @param uri  a feature URI
+	 * @param line a scenario line number
+	 * @return a code reference
+	 */
+	@Nonnull
+	protected String getCodeRef(@Nonnull String uri, int line) {
+		return uri + ":" + line;
+	}
+
+	@SuppressWarnings("unchecked")
+	protected TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
+		Field definitionMatchField = getDefinitionMatchField(testStep);
+		if (definitionMatchField != null) {
+			try {
+				Method method = retrieveMethod(definitionMatchField, testStep);
+				return TestCaseIdUtils.getTestCaseId(method.getAnnotation(TestCaseId.class),
+						method,
+						codeRef,
+						(List<Object>) ARGUMENTS_TRANSFORM.apply(testStep.getDefinitionArgument())
+				);
+			} catch (NoSuchFieldException | IllegalAccessException ignore) {
+			}
+		}
+		return getTestCaseId(codeRef, testStep.getDefinitionArgument());
+	}
+
+	@SuppressWarnings("unchecked")
+	protected TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.runtime.Argument> arguments) {
+		return TestCaseIdUtils.getTestCaseId(codeRef, (List<Object>) ARGUMENTS_TRANSFORM.apply(arguments));
+	}
+
+	/**
+	 * Returns a list of parameters for a step
+	 *
+	 * @param codeRef  a method code reference to retrieve parameter types
+	 * @param testStep Cucumber's Step object
+	 * @return a list of parameters or empty list if none
+	 */
+	protected List<ParameterResource> getParameters(String codeRef, TestStep testStep) {
+		List<Pair<String, String>> params = ofNullable(testStep.getDefinitionArgument()).map(a -> IntStream.range(0, a.size())
+				.mapToObj(i -> Pair.of("arg" + i, a.get(i).getVal()))
+				.collect(Collectors.toList())).orElse(Collections.emptyList());
+		params.addAll(ofNullable(testStep.getStepArgument()).map(a -> IntStream.range(0, a.size()).mapToObj(i -> {
+			Argument arg = a.get(i);
+			String value = arg instanceof PickleString ? ((PickleString) arg).getContent() : arg.toString();
+			return Pair.of("arg" + i, value);
+		}).collect(Collectors.toList())).orElse(Collections.emptyList()));
+		return ParameterUtils.getParameters(codeRef, params);
+	}
+
+	/**
+	 * Build an item description for a scenario
+	 *
+	 * @param testCase a Cucumber's TestCase object
+	 * @param uri      a feature URI
+	 * @return item description
+	 */
+	@Nonnull
+	protected String getDescription(@Nonnull TestCase testCase, @Nonnull String uri) {
+		return uri;
+	}
+
+	/**
+	 * Build an item description for a feature
+	 *
+	 * @param feature a Cucumber's Feature object
+	 * @param uri     a feature URI
+	 * @return item description
+	 */
+	@Nonnull
+	protected String getDescription(@Nonnull Feature feature, @Nonnull String uri) {
+		return uri;
+	}
+
+	/**
+	 * Returns hook type and name as a <code>Pair</code>
+	 *
+	 * @param hookType Cucumber's hoo type
+	 * @return a pair of type and name
+	 */
+	@Nonnull
+	protected Pair<String, String> getHookTypeAndName(@Nonnull HookType hookType) {
+		String name = null;
+		String type = null;
+		switch (hookType) {
+			case Before:
+				name = "Before hooks";
+				type = "BEFORE_TEST";
+				break;
+			case After:
+				name = "After hooks";
+				type = "AFTER_TEST";
+				break;
+		}
+		return Pair.of(type, name);
 	}
 }
