@@ -386,6 +386,7 @@ public abstract class AbstractReporter implements Formatter {
 	 *
 	 * @param hookType a hook type
 	 */
+	@SuppressWarnings("unused")
 	protected void afterHooks(HookType hookType) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
 		launch.get().getStepReporter().finishPreviousStep();
@@ -720,7 +721,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param step - Cucumber's TestStep object
 	 * @return - transformed multiline argument (or empty string if there is none)
 	 */
-	protected String buildMultilineArgument(TestStep step) {
+	@Nonnull
+	protected String buildMultilineArgument(@Nonnull TestStep step) {
 		List<PickleRow> table = null;
 		String dockString = "";
 		StringBuilder marg = new StringBuilder();
@@ -808,7 +810,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * @return a code reference, or null if not possible to determine (ambiguous, undefined, etc.)
 	 */
 	@Nullable
-	protected String getCodeRef(TestStep testStep) {
+	protected String getCodeRef(@Nonnull TestStep testStep) {
 
 		Field definitionMatchField = getDefinitionMatchField(testStep);
 
@@ -844,8 +846,16 @@ public abstract class AbstractReporter implements Formatter {
 		return uri + ":" + line;
 	}
 
+	/**
+	 * Return a Test Case ID for mapped code
+	 *
+	 * @param testStep   Cucumber's TestStep object
+	 * @param codeRef a code reference
+	 * @return Test Case ID entity or null if it's not possible to calculate
+	 */
+	@Nullable
 	@SuppressWarnings("unchecked")
-	protected TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
+	protected TestCaseIdEntry getTestCaseId(@Nonnull TestStep testStep, @Nullable String codeRef) {
 		Field definitionMatchField = getDefinitionMatchField(testStep);
 		if (definitionMatchField != null) {
 			try {
@@ -861,8 +871,16 @@ public abstract class AbstractReporter implements Formatter {
 		return getTestCaseId(codeRef, testStep.getDefinitionArgument());
 	}
 
+	/**
+	 * Return a Test Case ID for a feature file
+	 *
+	 * @param codeRef   a code reference
+	 * @param arguments a scenario arguments
+	 * @return Test Case ID entity or null if it's not possible to calculate
+	 */
+	@Nullable
 	@SuppressWarnings("unchecked")
-	protected TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.runtime.Argument> arguments) {
+	protected TestCaseIdEntry getTestCaseId(@Nullable String codeRef, @Nullable List<cucumber.runtime.Argument> arguments) {
 		return TestCaseIdUtils.getTestCaseId(codeRef, (List<Object>) ARGUMENTS_TRANSFORM.apply(arguments));
 	}
 
@@ -873,7 +891,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param testStep Cucumber's Step object
 	 * @return a list of parameters or empty list if none
 	 */
-	protected List<ParameterResource> getParameters(String codeRef, TestStep testStep) {
+	@Nonnull
+	protected List<ParameterResource> getParameters(@Nullable String codeRef, @Nonnull TestStep testStep) {
 		List<Pair<String, String>> params = ofNullable(testStep.getDefinitionArgument()).map(a -> IntStream.range(0, a.size())
 				.mapToObj(i -> Pair.of("arg" + i, a.get(i).getVal()))
 				.collect(Collectors.toList())).orElse(Collections.emptyList());
@@ -893,6 +912,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * @return item description
 	 */
 	@Nonnull
+	@SuppressWarnings("unused")
 	protected String getDescription(@Nonnull TestCase testCase, @Nonnull String uri) {
 		return uri;
 	}
@@ -905,6 +925,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * @return item description
 	 */
 	@Nonnull
+	@SuppressWarnings("unused")
 	protected String getDescription(@Nonnull Feature feature, @Nonnull String uri) {
 		return uri;
 	}
