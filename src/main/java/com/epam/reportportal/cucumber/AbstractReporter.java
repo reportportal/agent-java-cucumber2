@@ -515,16 +515,28 @@ public abstract class AbstractReporter implements Formatter {
 	@Nonnull
 	protected abstract Optional<Maybe<String>> getRootItemId();
 
+	/**
+	 * Extension point to customize feature creation event/request
+	 *
+	 * @param feature a Cucumber's Feature object
+	 * @param uri     a path to the feature
+	 * @return Request to ReportPortal
+	 */
+	protected StartTestItemRQ buildStartFeatureRequest(Feature feature, String uri) {
+		String featureKeyword = feature.getKeyword();
+		String featureName = feature.getName();
+		StartTestItemRQ startFeatureRq = new StartTestItemRQ();
+		startFeatureRq.setDescription(getDescription(feature, uri));
+		startFeatureRq.setCodeRef(getCodeRef(uri, 0));
+		startFeatureRq.setName(buildName(featureKeyword, AbstractReporter.COLON_INFIX, featureName));
+		startFeatureRq.setAttributes(extractAttributes(feature.getTags()));
+		startFeatureRq.setStartTime(Calendar.getInstance().getTime());
+		startFeatureRq.setType(getFeatureTestItemType());
+		return startFeatureRq;
+	}
+
 	private RunningContext.FeatureContext startFeatureContext(RunningContext.FeatureContext context) {
-		String featureKeyword = context.getFeature().getKeyword();
-		String featureName = context.getFeature().getName();
-		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setDescription(getDescription(context.getFeature(), context.getUri()));
-		rq.setCodeRef(getCodeRef(context.getUri(), 0));
-		rq.setName(buildName(featureKeyword, AbstractReporter.COLON_INFIX, featureName));
-		rq.setAttributes(extractAttributes(context.getFeature().getTags()));
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType(getFeatureTestItemType());
+		StartTestItemRQ rq = buildStartFeatureRequest(context.getFeature(), context.getUri());
 		Optional<Maybe<String>> root = getRootItemId();
 		context.setFeatureId(root.map(r -> launch.get().startTestItem(r, rq)).orElseGet(() -> launch.get().startTestItem(rq)));
 		return context;
