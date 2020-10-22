@@ -698,7 +698,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param status - Cucumber status
 	 * @return RP test item status and null if status is null
 	 */
-	protected String mapItemStatus(Result.Type status) {
+	@Nullable
+	protected String mapItemStatus(@Nullable Result.Type status) {
 		if (status == null) {
 			return null;
 		} else {
