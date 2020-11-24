@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [5.0.1]
 ### Added
 - Missed javadocs and annotations
 - A protected method `buildStartFeatureRequest` to ease Feature creation customization
