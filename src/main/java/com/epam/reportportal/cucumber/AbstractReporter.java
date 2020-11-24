@@ -88,7 +88,6 @@ public abstract class AbstractReporter implements Formatter {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AbstractReporter.class);
 	private static final String AGENT_PROPERTIES_FILE = "agent.properties";
-	private static final int DEFAULT_CAPACITY = 16;
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
@@ -183,7 +182,7 @@ public abstract class AbstractReporter implements Formatter {
 
 	private void addToTree(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
 		retrieveLeaf(featureContext.getUri(), ITEM_TREE).ifPresent(suiteLeaf -> suiteLeaf.getChildItems()
-				.put(createKey(scenarioContext.getLine()), TestItemTree.createTestItemLeaf(scenarioContext.getId(), DEFAULT_CAPACITY)));
+				.put(createKey(scenarioContext.getLine()), TestItemTree.createTestItemLeaf(scenarioContext.getId())));
 	}
 
 	/**
@@ -316,7 +315,7 @@ public abstract class AbstractReporter implements Formatter {
 		retrieveLeaf(scenarioContext.getFeatureUri(),
 				scenarioContext.getLine(),
 				ITEM_TREE
-		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId, 0)));
+		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId)));
 	}
 
 	/**
@@ -386,6 +385,7 @@ public abstract class AbstractReporter implements Formatter {
 	 *
 	 * @param hookType a hook type
 	 */
+	@SuppressWarnings("unused")
 	protected void afterHooks(HookType hookType) {
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
 		launch.get().getStepReporter().finishPreviousStep();
@@ -436,8 +436,7 @@ public abstract class AbstractReporter implements Formatter {
 		String errorMessage = result.getErrorMessage();
 		if (errorMessage != null) {
 			sendLog(errorMessage, level);
-		}
-		if (result.getError() != null) {
+		} else if (result.getError() != null) {
 			sendLog(getStackTraceAsString(result.getError()), level);
 		}
 	}
@@ -514,17 +513,29 @@ public abstract class AbstractReporter implements Formatter {
 	@Nonnull
 	protected abstract Optional<Maybe<String>> getRootItemId();
 
+	/**
+	 * Extension point to customize feature creation event/request
+	 *
+	 * @param feature a Cucumber's Feature object
+	 * @param uri     a path to the feature
+	 * @return Request to ReportPortal
+	 */
+	protected StartTestItemRQ buildStartFeatureRequest(Feature feature, String uri) {
+		String featureKeyword = feature.getKeyword();
+		String featureName = feature.getName();
+		StartTestItemRQ startFeatureRq = new StartTestItemRQ();
+		startFeatureRq.setDescription(getDescription(feature, uri));
+		startFeatureRq.setCodeRef(getCodeRef(uri, 0));
+		startFeatureRq.setName(buildName(featureKeyword, AbstractReporter.COLON_INFIX, featureName));
+		startFeatureRq.setAttributes(extractAttributes(feature.getTags()));
+		startFeatureRq.setStartTime(Calendar.getInstance().getTime());
+		startFeatureRq.setType(getFeatureTestItemType());
+		return startFeatureRq;
+	}
+
 	private RunningContext.FeatureContext startFeatureContext(RunningContext.FeatureContext context) {
-		String featureKeyword = context.getFeature().getKeyword();
-		String featureName = context.getFeature().getName();
-		StartTestItemRQ rq = new StartTestItemRQ();
-		rq.setDescription(getDescription(context.getFeature(), context.getUri()));
-		rq.setCodeRef(getCodeRef(context.getUri(), 0));
-		rq.setName(buildName(featureKeyword, AbstractReporter.COLON_INFIX, featureName));
-		rq.setAttributes(extractAttributes(context.getFeature().getTags()));
-		rq.setStartTime(Calendar.getInstance().getTime());
-		rq.setType(getFeatureTestItemType());
 		Optional<Maybe<String>> root = getRootItemId();
+		StartTestItemRQ rq = buildStartFeatureRequest(context.getFeature(), context.getUri());
 		context.setFeatureId(root.map(r -> launch.get().startTestItem(r, rq)).orElseGet(() -> launch.get().startTestItem(rq)));
 		return context;
 	}
@@ -583,7 +594,7 @@ public abstract class AbstractReporter implements Formatter {
 
 	private void addToTree(RunningContext.FeatureContext context) {
 		ITEM_TREE.getTestItems()
-				.put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId(), DEFAULT_CAPACITY));
+				.put(createKey(context.getUri()), TestItemTree.createTestItemLeaf(context.getFeatureId()));
 	}
 
 	protected void handleStartOfTestCase(TestCaseStarted event) {
@@ -685,7 +696,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param status - Cucumber status
 	 * @return RP test item status and null if status is null
 	 */
-	protected String mapItemStatus(Result.Type status) {
+	@Nullable
+	protected String mapItemStatus(@Nullable Result.Type status) {
 		if (status == null) {
 			return null;
 		} else {
@@ -720,7 +732,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param step - Cucumber's TestStep object
 	 * @return - transformed multiline argument (or empty string if there is none)
 	 */
-	protected String buildMultilineArgument(TestStep step) {
+	@Nonnull
+	protected String buildMultilineArgument(@Nonnull TestStep step) {
 		List<PickleRow> table = null;
 		String dockString = "";
 		StringBuilder marg = new StringBuilder();
@@ -808,7 +821,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * @return a code reference, or null if not possible to determine (ambiguous, undefined, etc.)
 	 */
 	@Nullable
-	protected String getCodeRef(TestStep testStep) {
+	protected String getCodeRef(@Nonnull TestStep testStep) {
 
 		Field definitionMatchField = getDefinitionMatchField(testStep);
 
@@ -844,8 +857,16 @@ public abstract class AbstractReporter implements Formatter {
 		return uri + ":" + line;
 	}
 
+	/**
+	 * Return a Test Case ID for mapped code
+	 *
+	 * @param testStep   Cucumber's TestStep object
+	 * @param codeRef a code reference
+	 * @return Test Case ID entity or null if it's not possible to calculate
+	 */
+	@Nullable
 	@SuppressWarnings("unchecked")
-	protected TestCaseIdEntry getTestCaseId(TestStep testStep, String codeRef) {
+	protected TestCaseIdEntry getTestCaseId(@Nonnull TestStep testStep, @Nullable String codeRef) {
 		Field definitionMatchField = getDefinitionMatchField(testStep);
 		if (definitionMatchField != null) {
 			try {
@@ -861,8 +882,16 @@ public abstract class AbstractReporter implements Formatter {
 		return getTestCaseId(codeRef, testStep.getDefinitionArgument());
 	}
 
+	/**
+	 * Return a Test Case ID for a feature file
+	 *
+	 * @param codeRef   a code reference
+	 * @param arguments a scenario arguments
+	 * @return Test Case ID entity or null if it's not possible to calculate
+	 */
+	@Nullable
 	@SuppressWarnings("unchecked")
-	protected TestCaseIdEntry getTestCaseId(String codeRef, List<cucumber.runtime.Argument> arguments) {
+	protected TestCaseIdEntry getTestCaseId(@Nullable String codeRef, @Nullable List<cucumber.runtime.Argument> arguments) {
 		return TestCaseIdUtils.getTestCaseId(codeRef, (List<Object>) ARGUMENTS_TRANSFORM.apply(arguments));
 	}
 
@@ -873,7 +902,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param testStep Cucumber's Step object
 	 * @return a list of parameters or empty list if none
 	 */
-	protected List<ParameterResource> getParameters(String codeRef, TestStep testStep) {
+	@Nonnull
+	protected List<ParameterResource> getParameters(@Nullable String codeRef, @Nonnull TestStep testStep) {
 		List<Pair<String, String>> params = ofNullable(testStep.getDefinitionArgument()).map(a -> IntStream.range(0, a.size())
 				.mapToObj(i -> Pair.of("arg" + i, a.get(i).getVal()))
 				.collect(Collectors.toList())).orElse(Collections.emptyList());
@@ -893,6 +923,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * @return item description
 	 */
 	@Nonnull
+	@SuppressWarnings("unused")
 	protected String getDescription(@Nonnull TestCase testCase, @Nonnull String uri) {
 		return uri;
 	}
@@ -905,6 +936,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * @return item description
 	 */
 	@Nonnull
+	@SuppressWarnings("unused")
 	protected String getDescription(@Nonnull Feature feature, @Nonnull String uri) {
 		return uri;
 	}
