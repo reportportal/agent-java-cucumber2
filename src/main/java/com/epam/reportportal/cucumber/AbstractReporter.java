@@ -733,31 +733,27 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	@Nonnull
 	protected String buildMultilineArgument(@Nonnull TestStep step) {
-		List<PickleRow> table = null;
-		String dockString = "";
-		StringBuilder marg = new StringBuilder();
-
+		List<List<String>> table = null;
+		String docString = null;
 		if (!step.getStepArgument().isEmpty()) {
 			Argument argument = step.getStepArgument().get(0);
 			if (argument instanceof PickleString) {
-				dockString = ((PickleString) argument).getContent();
+				docString = ((PickleString) argument).getContent();
 			} else if (argument instanceof PickleTable) {
-				table = ((PickleTable) argument).getRows();
-			}
-		}
-		if (table != null) {
-			marg.append("\r\n");
-			for (PickleRow row : table) {
-				marg.append(TABLE_SEPARATOR);
-				for (PickleCell cell : row.getCells()) {
-					marg.append(" ").append(cell.getValue()).append(" ").append(TABLE_SEPARATOR);
-				}
-				marg.append("\r\n");
+				table = ((PickleTable) argument).getRows()
+						.stream()
+						.map(r -> r.getCells().stream().map(PickleCell::getValue).collect(Collectors.toList()))
+						.collect(Collectors.toList());
 			}
 		}
 
-		if (!dockString.isEmpty()) {
-			marg.append(DOCSTRING_DECORATOR).append(dockString).append(DOCSTRING_DECORATOR);
+		StringBuilder marg = new StringBuilder();
+		if (table != null) {
+			marg.append(formatDataTable(table));
+		}
+
+		if (docString != null) {
+			marg.append(DOCSTRING_DECORATOR).append(docString).append(DOCSTRING_DECORATOR);
 		}
 		return marg.toString();
 	}
@@ -908,7 +904,17 @@ public abstract class AbstractReporter implements Formatter {
 				.collect(Collectors.toList())).orElse(Collections.emptyList());
 		params.addAll(ofNullable(testStep.getStepArgument()).map(a -> IntStream.range(0, a.size()).mapToObj(i -> {
 			Argument arg = a.get(i);
-			String value = arg instanceof PickleString ? ((PickleString) arg).getContent() : arg.toString();
+			String value;
+			if (arg instanceof PickleString) {
+				value = ((PickleString) arg).getContent();
+			} else if (arg instanceof PickleTable) {
+				value = formatDataTable(((PickleTable) arg).getRows()
+						.stream()
+						.map(r -> r.getCells().stream().map(PickleCell::getValue).collect(Collectors.toList()))
+						.collect(Collectors.toList()));
+			} else {
+				value = arg.toString();
+			}
 			return Pair.of("arg" + i, value);
 		}).collect(Collectors.toList())).orElse(Collections.emptyList()));
 		return ParameterUtils.getParameters(codeRef, params);
