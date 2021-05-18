@@ -144,13 +144,12 @@ public class CodeRefTest {
 				.forEach(i -> assertThat(steps.get(i).getCodeRef(), allOf(notNullValue(), equalTo(STEP_CODE_REFERENCE.get(i)))));
 	}
 
-	private static final List<String> TWO_FEATURES_CODE_REFERENCES = Arrays.asList("src/test/resources/features/TwoScenarioInOne.feature:3",
-			"src/test/resources/features/TwoScenarioInOne.feature:7");
+	private static final String[] TWO_FEATURES_CODE_REFERENCES = new String[] { "src/test/resources/features/TwoScenarioInOne.feature:3",
+			"src/test/resources/features/TwoScenarioInOne.feature:7" };
 
-	private static final List<String> TWO_STEPS_CODE_REFERENCE = Arrays.asList(
+	private static final String[] TWO_STEPS_CODE_REFERENCE = new String[] {
 			"com.epam.reportportal.cucumber.integration.feature.EmptySteps.i_have_empty_step",
-			"com.epam.reportportal.cucumber.integration.feature.EmptySteps.i_have_another_empty_step"
-	);
+			"com.epam.reportportal.cucumber.integration.feature.EmptySteps.i_have_another_empty_step" };
 
 	@Test
 	public void verify_code_reference_two_features_step_reporter() {
@@ -166,11 +165,13 @@ public class CodeRefTest {
 		List<StartTestItemRQ> suites = items.subList(0, 2);
 		List<StartTestItemRQ> steps = items.subList(2, items.size());
 
-		IntStream.range(0, TWO_FEATURES_CODE_REFERENCES.size()).forEach(i -> assertThat(suites.get(i).getCodeRef(), allOf(notNullValue(),
-				equalTo(TWO_FEATURES_CODE_REFERENCES.get(i))
-		)));
+		List<String> suiteCodeRefs = suites.stream().map(StartTestItemRQ::getCodeRef).collect(Collectors.toList());
+		assertThat(suiteCodeRefs, hasSize(TWO_FEATURES_CODE_REFERENCES.length));
+		assertThat(suiteCodeRefs, containsInAnyOrder(TWO_FEATURES_CODE_REFERENCES));
 
-		IntStream.range(0, TWO_STEPS_CODE_REFERENCE.size())
-				.forEach(i -> assertThat(steps.get(i).getCodeRef(), allOf(notNullValue(), equalTo(TWO_STEPS_CODE_REFERENCE.get(i)))));
+		List<String> stepsCodeRefs = steps.stream().map(StartTestItemRQ::getCodeRef).collect(Collectors.toList());
+		assertThat(stepsCodeRefs, hasSize(TWO_STEPS_CODE_REFERENCE.length * 2));
+		assertThat(stepsCodeRefs.subList(0, 2), containsInAnyOrder(TWO_STEPS_CODE_REFERENCE));
+		assertThat(stepsCodeRefs.subList(2, stepsCodeRefs.size()), containsInAnyOrder(TWO_STEPS_CODE_REFERENCE));
 	}
 }
