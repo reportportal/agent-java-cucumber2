@@ -91,7 +91,6 @@ public abstract class AbstractReporter implements Formatter {
 	private static final String STEP_DEFINITION_FIELD_NAME = "stepDefinition";
 	private static final String GET_LOCATION_METHOD_NAME = "getLocation";
 	private static final String METHOD_OPENING_BRACKET = "(";
-	private static final String TABLE_SEPARATOR = "|";
 	private static final String DOCSTRING_DECORATOR = "\n\"\"\"\n";
 
 	public static final TestItemTree ITEM_TREE = new TestItemTree();
