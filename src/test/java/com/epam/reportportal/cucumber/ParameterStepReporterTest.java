@@ -20,7 +20,6 @@ import com.epam.reportportal.cucumber.integration.TestScenarioReporter;
 import com.epam.reportportal.cucumber.integration.TestStepReporter;
 import com.epam.reportportal.cucumber.integration.util.TestUtils;
 import com.epam.reportportal.listeners.ListenerParameters;
-import com.epam.reportportal.restendpoint.http.MultiPartRequest;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.ReportPortalClient;
 import com.epam.reportportal.util.test.CommonUtils;
@@ -29,6 +28,7 @@ import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import cucumber.api.CucumberOptions;
 import cucumber.api.testng.AbstractTestNGCucumberTests;
+import okhttp3.MultipartBody;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static com.epam.reportportal.cucumber.integration.util.TestUtils.filterLogs;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.any;
@@ -111,8 +112,7 @@ public class ParameterStepReporterTest {
 		TestStepReporter.RP.set(reportPortal);
 	}
 
-	public static final List<Pair<String, Object>> PARAMETERS = Arrays.asList(
-			Pair.of("java.lang.String", "first"),
+	public static final List<Pair<String, Object>> PARAMETERS = Arrays.asList(Pair.of("java.lang.String", "first"),
 			Pair.of("int", 123),
 			Pair.of("java.lang.String", "second"),
 			Pair.of("int", 12345),
@@ -120,8 +120,7 @@ public class ParameterStepReporterTest {
 			Pair.of("int", 12345678)
 	);
 
-	public static final List<String> STEP_NAMES = Arrays.asList(
-			String.format("When I have parameter %s", PARAMETERS.get(0).getValue()),
+	public static final List<String> STEP_NAMES = Arrays.asList(String.format("When I have parameter %s", PARAMETERS.get(0).getValue()),
 			String.format("Then I emit number %s on level info", PARAMETERS.get(1).getValue().toString()),
 			String.format("When I have parameter %s", PARAMETERS.get(2).getValue()),
 			String.format("Then I emit number %s on level info", PARAMETERS.get(3).getValue().toString()),
@@ -219,13 +218,10 @@ public class ParameterStepReporterTest {
 		assertThat(param1.getKey(), equalTo("java.lang.String"));
 		assertThat(param1.getValue(), equalTo(DOCSTRING_PARAM));
 
-		ArgumentCaptor<MultiPartRequest> logCaptor = ArgumentCaptor.forClass(MultiPartRequest.class);
+		ArgumentCaptor<List<MultipartBody.Part>> logCaptor = ArgumentCaptor.forClass(List.class);
 		verify(client, times(2)).log(logCaptor.capture());
-		List<String> logs = logCaptor.getAllValues()
-				.stream()
-				.flatMap(l -> l.getSerializedRQs().stream())
-				.flatMap(l -> ((List<SaveLogRQ>) l.getRequest()).stream())
-				.filter(l -> l.getItemUuid().equals(tests.get(0).getValue().get(1)))
+
+		List<String> logs = filterLogs(logCaptor, l -> l.getItemUuid().equals(tests.get(0).getValue().get(1))).stream()
 				.map(SaveLogRQ::getMessage)
 				.collect(Collectors.toList());
 
@@ -248,14 +244,10 @@ public class ParameterStepReporterTest {
 		assertThat(param1.getKey(), equalTo("cucumber.api.DataTable"));
 		assertThat(param1.getValue(), equalTo(TABLE_PARAM));
 
-		ArgumentCaptor<MultiPartRequest> logCaptor = ArgumentCaptor.forClass(MultiPartRequest.class);
+		ArgumentCaptor<List<MultipartBody.Part>> logCaptor = ArgumentCaptor.forClass(List.class);
 		verify(client, times(1)).log(logCaptor.capture());
-		MultiPartRequest logRq = logCaptor.getValue();
 
-		List<String> logs = logRq.getSerializedRQs()
-				.stream()
-				.flatMap(l -> ((List<SaveLogRQ>) l.getRequest()).stream())
-				.filter(l -> l.getItemUuid().equals(tests.get(0).getValue().get(0)))
+		List<String> logs = filterLogs(logCaptor, l -> l.getItemUuid().equals(tests.get(0).getValue().get(0))).stream()
 				.map(SaveLogRQ::getMessage)
 				.collect(Collectors.toList());
 

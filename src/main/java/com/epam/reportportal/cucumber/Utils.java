@@ -16,11 +16,11 @@
 package com.epam.reportportal.cucumber;
 
 import com.epam.reportportal.listeners.ItemStatus;
+import com.google.common.collect.ImmutableMap;
 import cucumber.api.Result;
 import cucumber.api.TestStep;
 import cucumber.runtime.StepDefinitionMatch;
 import io.reactivex.annotations.Nullable;
-import rp.com.google.common.collect.ImmutableMap;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
