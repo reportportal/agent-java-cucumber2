@@ -50,28 +50,28 @@ import static org.mockito.Mockito.*;
 
 @SuppressWarnings("unchecked")
 public class EmbeddingTest {
-	@CucumberOptions(features = "src/test/resources/features/ImageEmbeddingFeature.feature", glue = {
+	@CucumberOptions(features = "src/test/resources/features/embedding/ImageEmbeddingFeature.feature", glue = {
 			"com.epam.reportportal.cucumber.integration.embed.image" }, plugin = { "pretty",
 			"com.epam.reportportal.cucumber.integration.TestStepReporter" })
 	public static class ImageStepReporter extends AbstractTestNGCucumberTests {
 
 	}
 
-	@CucumberOptions(features = "src/test/resources/features/TextEmbeddingFeature.feature", glue = {
+	@CucumberOptions(features = "src/test/resources/features/embedding/TextEmbeddingFeature.feature", glue = {
 			"com.epam.reportportal.cucumber.integration.embed.text" }, plugin = { "pretty",
 			"com.epam.reportportal.cucumber.integration.TestStepReporter" })
 	public static class TextStepReporter extends AbstractTestNGCucumberTests {
 
 	}
 
-	@CucumberOptions(features = "src/test/resources/features/PdfEmbeddingFeature.feature", glue = {
+	@CucumberOptions(features = "src/test/resources/features/embedding/PdfEmbeddingFeature.feature", glue = {
 			"com.epam.reportportal.cucumber.integration.embed.pdf" }, plugin = { "pretty",
 			"com.epam.reportportal.cucumber.integration.TestStepReporter" })
 	public static class PdfStepReporter extends AbstractTestNGCucumberTests {
 
 	}
 
-	@CucumberOptions(features = "src/test/resources/features/ArchiveEmbeddingFeature.feature", glue = {
+	@CucumberOptions(features = "src/test/resources/features/embedding/ArchiveEmbeddingFeature.feature", glue = {
 			"com.epam.reportportal.cucumber.integration.embed.zip" }, plugin = { "pretty",
 			"com.epam.reportportal.cucumber.integration.TestStepReporter" })
 	public static class ZipStepReporter extends AbstractTestNGCucumberTests {
