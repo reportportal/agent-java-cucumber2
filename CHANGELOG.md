@@ -6,6 +6,7 @@
 - Version changed on 5.1.0
 ### Fixed
 - Possible immutable list modification error in AbstractReporter#getParameters method
+- Scenario outlines with dynamic names support
 
 ## [5.0.2]
 ### Changed

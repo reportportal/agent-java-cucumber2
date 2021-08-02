@@ -209,7 +209,11 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param scenarioContext current scenario context
 	 */
 	protected void beforeScenario(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
-		String scenarioName = buildName(scenarioContext.getKeyword(), AbstractReporter.COLON_INFIX, scenarioContext.getName());
+		String scenarioName = Utils.buildName(
+				scenarioContext.getKeyword(),
+				AbstractReporter.COLON_INFIX,
+				scenarioContext.getTestCase().getName()
+		);
 		Launch myLaunch = launch.get();
 		Maybe<String> id = myLaunch.startTestItem(featureContext.getFeatureId(),
 				buildStartScenarioRequest(scenarioContext.getTestCase(), scenarioName, featureContext.getUri(), scenarioContext.getLine())
