@@ -24,10 +24,7 @@ import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.service.tree.TestItemTree;
-import com.epam.reportportal.utils.AttributeParser;
-import com.epam.reportportal.utils.MemoizingSupplier;
-import com.epam.reportportal.utils.ParameterUtils;
-import com.epam.reportportal.utils.TestCaseIdUtils;
+import com.epam.reportportal.utils.*;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
@@ -35,6 +32,7 @@ import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
+import com.google.common.io.ByteSource;
 import cucumber.api.HookType;
 import cucumber.api.Result;
 import cucumber.api.TestCase;
@@ -47,18 +45,13 @@ import gherkin.ast.Step;
 import gherkin.ast.Tag;
 import gherkin.pickles.*;
 import io.reactivex.Maybe;
+import okhttp3.MediaType;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.tika.Tika;
-import org.apache.tika.mime.MediaType;
-import org.apache.tika.mime.MimeTypeException;
-import org.apache.tika.mime.MimeTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rp.com.google.common.io.ByteSource;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -440,15 +433,14 @@ public abstract class AbstractReporter implements Formatter {
 		}
 	}
 
-	private static final ThreadLocal<Tika> TIKA_THREAD_LOCAL = ThreadLocal.withInitial(Tika::new);
-
-	private volatile MimeTypes mimeTypes = null;
-
-	private MimeTypes getMimeTypes() {
-		if (mimeTypes == null) {
-			mimeTypes = MimeTypes.getDefaultMimeTypes();
+	@Nullable
+	private static String getDataType(@Nonnull byte[] data) {
+		try {
+			return MimeTypeDetector.detect(ByteSource.wrap(data), null);
+		} catch (IOException e) {
+			LOGGER.warn("Unable to detect MIME type", e);
 		}
-		return mimeTypes;
+		return null;
 	}
 
 	/**
@@ -458,21 +450,20 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param data     data to attach
 	 */
 	protected void embedding(String mimeType, byte[] data) {
-		String type = mimeType;
-		try {
-			type = TIKA_THREAD_LOCAL.get().detect(new ByteArrayInputStream(data));
-		} catch (IOException e) {
-			// nothing to do we will use bypassed mime type
-			LOGGER.warn("Mime-type not found", e);
-		}
-		String prefix = "";
-		try {
-			MediaType mt = getMimeTypes().forName(type).getType();
-			prefix = mt.getType();
-		} catch (MimeTypeException e) {
-			LOGGER.warn("Mime-type not found", e);
-		}
-		ReportPortal.emitLog(new ReportPortalMessage(ByteSource.wrap(data), type, prefix), "UNKNOWN", Calendar.getInstance().getTime());
+		String type = ofNullable(mimeType).filter(m -> {
+			try {
+				MediaType.get(m);
+				return true;
+			} catch (IllegalArgumentException e) {
+				LOGGER.warn("Incorrect media type '{}'", m);
+				return false;
+			}
+		}).orElseGet(() -> getDataType(data));
+		String attachmentName = ofNullable(type).map(t -> t.substring(0, t.indexOf("/"))).orElse("");
+		ReportPortal.emitLog(new ReportPortalMessage(ByteSource.wrap(data), type, attachmentName),
+				"UNKNOWN",
+				Calendar.getInstance().getTime()
+		);
 	}
 
 	/**
@@ -900,7 +891,7 @@ public abstract class AbstractReporter implements Formatter {
 	protected List<ParameterResource> getParameters(@Nullable String codeRef, @Nonnull TestStep testStep) {
 		List<Pair<String, String>> params = ofNullable(testStep.getDefinitionArgument()).map(a -> IntStream.range(0, a.size())
 				.mapToObj(i -> Pair.of("arg" + i, a.get(i).getVal()))
-				.collect(Collectors.toList())).orElse(Collections.emptyList());
+				.collect(Collectors.toList())).orElse(new ArrayList<>());
 		params.addAll(ofNullable(testStep.getStepArgument()).map(a -> IntStream.range(0, a.size()).mapToObj(i -> {
 			Argument arg = a.get(i);
 			String value;
