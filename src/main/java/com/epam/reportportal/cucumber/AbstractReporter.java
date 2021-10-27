@@ -620,6 +620,7 @@ public abstract class AbstractReporter implements Formatter {
 		RunningContext.FeatureContext newFeatureContext = new RunningContext.FeatureContext(testCase);
 		String featureUri = newFeatureContext.getUri();
 		RunningContext.FeatureContext featureContext = currentFeatureContextMap.computeIfAbsent(featureUri, u -> {
+			getRootItemId(); // trigger root item creation
 			newFeatureContext.setFeatureId(startFeature(buildStartFeatureRequest(newFeatureContext.getFeature(), featureUri)));
 			if (launch.get().getParameters().isCallbackReportingEnabled()) {
 				addToTree(newFeatureContext);
