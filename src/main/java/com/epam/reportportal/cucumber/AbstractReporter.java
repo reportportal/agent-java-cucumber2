@@ -266,7 +266,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param line     the scenario text line number
 	 * @return start test item request ready to send on RP
 	 */
-	protected StartTestItemRQ buildStartScenarioRequest(TestCase testCase, String name, String uri, int line) {
+	@Nonnull
+	protected StartTestItemRQ buildStartScenarioRequest(@Nonnull TestCase testCase, @Nonnull String name, @Nonnull String uri, int line) {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		rq.setName(name);
 		rq.setDescription(getDescription(testCase, uri));

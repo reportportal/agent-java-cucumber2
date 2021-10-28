@@ -22,6 +22,8 @@ import com.epam.reportportal.util.test.CommonUtils;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import cucumber.api.TestCase;
 
+import javax.annotation.Nonnull;
+
 public class TestStepReporterWithPause extends StepReporter {
 	public static final ThreadLocal<ReportPortal> RP = new ThreadLocal<>();
 
@@ -31,7 +33,8 @@ public class TestStepReporterWithPause extends StepReporter {
 	}
 
 	@Override
-	protected StartTestItemRQ buildStartScenarioRequest(TestCase testCase, String name, String uri, int line)  {
+	@Nonnull
+	protected StartTestItemRQ buildStartScenarioRequest(@Nonnull TestCase testCase, @Nonnull String name, @Nonnull String uri, int line)  {
 		StartTestItemRQ result = super.buildStartScenarioRequest(testCase, name, uri, line);
 		try {
 			Thread.sleep(CommonUtils.MINIMAL_TEST_PAUSE);
