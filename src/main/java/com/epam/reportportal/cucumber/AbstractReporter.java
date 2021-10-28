@@ -667,8 +667,9 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Build finish test item request object
 	 *
-	 * @param itemId item ID reference
-	 * @param status item result status
+	 * @param itemId     item ID reference
+	 * @param finishTime a datetime object to use as item end time
+	 * @param status     item result status
 	 * @return finish request
 	 */
 	@Nonnull
