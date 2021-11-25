@@ -266,7 +266,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param line     the scenario text line number
 	 * @return start test item request ready to send on RP
 	 */
-	protected StartTestItemRQ buildStartScenarioRequest(TestCase testCase, String name, String uri, int line) {
+	@Nonnull
+	protected StartTestItemRQ buildStartScenarioRequest(@Nonnull TestCase testCase, @Nonnull String name, @Nonnull String uri, int line) {
 		StartTestItemRQ rq = new StartTestItemRQ();
 		rq.setName(name);
 		rq.setDescription(getDescription(testCase, uri));
@@ -432,6 +433,18 @@ public abstract class AbstractReporter implements Formatter {
 	}
 
 	/**
+	 * Start before/after-hook item on Report Portal
+	 *
+	 * @param parentId  parent item id
+	 * @param rq hook start request
+	 * @return hook item id
+	 */
+	@Nonnull
+	protected Maybe<String> startHook(@Nonnull Maybe<String> parentId, @Nonnull StartTestItemRQ rq) {
+		return launch.get().startTestItem(parentId, rq);
+	}
+
+	/**
 	 * Called when before/after-hooks are started
 	 *
 	 * @param hookType a hook type
@@ -440,7 +453,7 @@ public abstract class AbstractReporter implements Formatter {
 		StartTestItemRQ rq = buildStartHookRequest(hookType);
 
 		RunningContext.ScenarioContext context = getCurrentScenarioContext();
-		context.setHookStepId(launch.get().startTestItem(context.getId(), rq));
+		context.setHookStepId(startHook(context.getId(), rq));
 		context.setHookStatus(Result.Type.PASSED);
 	}
 
@@ -666,8 +679,9 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Build finish test item request object
 	 *
-	 * @param itemId item ID reference
-	 * @param status item result status
+	 * @param itemId     item ID reference
+	 * @param finishTime a datetime object to use as item end time
+	 * @param status     item result status
 	 * @return finish request
 	 */
 	@Nonnull
