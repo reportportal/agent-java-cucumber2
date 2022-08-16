@@ -28,6 +28,7 @@ import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import cucumber.api.CucumberOptions;
 import cucumber.api.testng.AbstractTestNGCucumberTests;
 import org.apache.commons.lang3.tuple.Pair;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -112,7 +113,8 @@ public class AttributeReportingTest {
 
 		ArgumentCaptor<StartTestItemRQ> testCaptor = ArgumentCaptor.forClass(StartTestItemRQ.class);
 		verify(client, times(1)).startTestItem(same(suiteId), testCaptor.capture());
-		verifyAttributes(testCaptor.getValue().getAttributes(), Collections.singleton(Pair.of(null, "@ok")));
+		verifyAttributes(testCaptor.getValue().getAttributes(), Arrays.asList(
+				Pair.of(null, "@ok"), Pair.of("issue", "JIRA-1234"), Pair.of("issue", "JIRA-5678")));
 
 		ArgumentCaptor<StartTestItemRQ> stepCaptor = ArgumentCaptor.forClass(StartTestItemRQ.class);
 		verify(client, times(3)).startTestItem(same(testId), stepCaptor.capture());
@@ -135,11 +137,30 @@ public class AttributeReportingTest {
 
 		ArgumentCaptor<StartTestItemRQ> testCaptor = ArgumentCaptor.forClass(StartTestItemRQ.class);
 		verify(client, times(1)).startTestItem(same(testId), testCaptor.capture());
-		verifyAttributes(testCaptor.getValue().getAttributes(), Collections.singleton(Pair.of(null, "@ok")));
+		verifyAttributes(testCaptor.getValue().getAttributes(), Arrays.asList(
+				Pair.of(null, "@ok"), Pair.of("issue", "JIRA-1234"), Pair.of("issue", "JIRA-5678")));
 
 		ArgumentCaptor<StartTestItemRQ> stepCaptor = ArgumentCaptor.forClass(StartTestItemRQ.class);
 		verify(client, times(3)).startTestItem(same(stepIds.get(0)), stepCaptor.capture());
 
 		verifyAnnotationAttributes(stepCaptor.getAllValues());
+	}
+
+	@Test
+	public void verify_single_annotation_key_value_parsing() {
+		final AbstractReporter testReporter = new TestScenarioReporter();
+
+		assertThat(testReporter.createAttributeFromSingleValue("@MyTag"), Matchers.equalTo(new ItemAttributesRQ(null, "@MyTag")));
+		assertThat(testReporter.createAttributeFromSingleValue("@issue:JIRA-1234"), Matchers.equalTo(new ItemAttributesRQ("issue", "JIRA-1234")));
+		assertThat(testReporter.createAttributeFromSingleValue("@feature:SaveTheWorld"), Matchers.equalTo(new ItemAttributesRQ("feature", "SaveTheWorld")));
+		// legacy-support: in case for any reason you need a null-key like before, just start with "@:".
+		assertThat(testReporter.createAttributeFromSingleValue("@:issue:JIRA-1234"), Matchers.equalTo(new ItemAttributesRQ(null, "issue:JIRA-1234")));
+
+		// invalid input cases (should not throw an exception):
+		assertThat(testReporter.createAttributeFromSingleValue(null), Matchers.equalTo(new ItemAttributesRQ(null, null)));
+		assertThat(testReporter.createAttributeFromSingleValue(""), Matchers.equalTo(new ItemAttributesRQ(null, "")));
+		assertThat(testReporter.createAttributeFromSingleValue(":"), Matchers.equalTo(new ItemAttributesRQ(null, "")));
+		assertThat(testReporter.createAttributeFromSingleValue("@"), Matchers.equalTo(new ItemAttributesRQ(null, "@")));
+		assertThat(testReporter.createAttributeFromSingleValue("@:"), Matchers.equalTo(new ItemAttributesRQ(null, "")));
 	}
 }

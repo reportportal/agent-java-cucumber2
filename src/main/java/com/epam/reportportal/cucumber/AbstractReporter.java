@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -814,7 +815,7 @@ public abstract class AbstractReporter implements Formatter {
 	protected Set<ItemAttributesRQ> extractPickleTags(List<PickleTag> tags) {
 		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (PickleTag tag : tags) {
-			attributes.add(new ItemAttributesRQ(null, tag.getName()));
+			attributes.add(createAttributeFromSingleValue(tag.getName()));
 		}
 		return attributes;
 	}
@@ -828,9 +829,41 @@ public abstract class AbstractReporter implements Formatter {
 	protected Set<ItemAttributesRQ> extractAttributes(List<Tag> tags) {
 		Set<ItemAttributesRQ> attributes = new HashSet<>();
 		for (Tag tag : tags) {
-			attributes.add(new ItemAttributesRQ(null, tag.getName()));
+			attributes.add(createAttributeFromSingleValue(tag.getName()));
 		}
 		return attributes;
+	}
+
+	/**
+	 * Creates an ItemAttributesRQ from a single Tag-Annotation using the colon sign to separate key-value.<br>
+	 * Examples:
+	 * <ul>
+	 * <li>"@MyTag" =&gt; new ItemAttributesRQ(null, "@MyTag")</li>
+	 * <li>"@issue:JIRA-1234" =&gt; new ItemAttributesRQ("issue", "JIRA-1234")</li>
+	 * <li>"@feature:SaveTheWorld" =&gt; new ItemAttributesRQ("feature", "SaveTheWorld")</li>
+	 * <li>"@:@SomethingElse:SomeValue" (legacy support, in case you need a null key) =&gt; new ItemAttributesRQ(null, "@SomethingElse:SomeValue")</li>
+	 * </ul>
+	 * Additional Info: The splitting of the attributes is specially useful for the "Component health check" Widget.
+	 *
+	 * @param value The attribute as single value where key:vaue is separated by a colon ':'.
+	 * @return ItemAttributesRQ with the split key-value pair
+	 */
+	protected ItemAttributesRQ createAttributeFromSingleValue(String value) {
+		if (value == null || value.length() <= 0) {
+			return new ItemAttributesRQ(null, value);
+		}
+		if (value.indexOf(':') < 0) {
+			return new ItemAttributesRQ(null, value);
+		}
+
+		String keyValue = value.startsWith("@") ? value.substring(1) : value;
+		int colonIdx = keyValue.indexOf(':');
+		if (colonIdx == 0) {
+			// key is empty
+			return new ItemAttributesRQ(null, keyValue.substring(colonIdx + 1));
+		}
+
+		return new ItemAttributesRQ(keyValue.substring(0, colonIdx), keyValue.substring(colonIdx + 1));
 	}
 
 	/**

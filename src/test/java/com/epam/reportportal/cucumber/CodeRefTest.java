@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -92,7 +91,7 @@ public class CodeRefTest {
 
 	private static final String FEATURE_CODE_REFERENCES = "src/test/resources/features/belly.feature:0";
 
-	private static final String SCENARIO_CODE_REFERENCES = "src/test/resources/features/belly.feature:4";
+	private static final String SCENARIO_CODE_REFERENCES = "src/test/resources/features/belly.feature:6";
 
 	@Test
 	public void verify_code_reference_scenario_reporter() {

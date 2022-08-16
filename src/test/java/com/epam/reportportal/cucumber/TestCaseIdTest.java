@@ -40,7 +40,11 @@ import java.util.stream.Stream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 public class TestCaseIdTest {
 
@@ -97,7 +101,7 @@ public class TestCaseIdTest {
 		verify(client, times(1)).startTestItem(same(testId), captor.capture());
 
 		StartTestItemRQ rq = captor.getValue();
-		assertThat(rq.getTestCaseId(), equalTo("src/test/resources/features/belly.feature:4"));
+		assertThat(rq.getTestCaseId(), equalTo("src/test/resources/features/belly.feature:6"));
 
 	}
 
