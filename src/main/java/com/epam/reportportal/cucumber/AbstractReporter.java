@@ -18,6 +18,7 @@ package com.epam.reportportal.cucumber;
 import com.epam.reportportal.annotations.TestCaseId;
 import com.epam.reportportal.annotations.attribute.Attributes;
 import com.epam.reportportal.listeners.ItemStatus;
+import com.epam.reportportal.listeners.ItemType;
 import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.message.ReportPortalMessage;
 import com.epam.reportportal.service.Launch;
@@ -25,6 +26,8 @@ import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.service.tree.TestItemTree;
 import com.epam.reportportal.utils.*;
+import com.epam.reportportal.utils.files.ByteSource;
+import com.epam.reportportal.utils.markdown.MarkdownUtils;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
@@ -32,14 +35,12 @@ import com.epam.ta.reportportal.ws.model.ParameterResource;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
-import com.google.common.io.ByteSource;
 import cucumber.api.HookType;
 import cucumber.api.Result;
 import cucumber.api.TestCase;
 import cucumber.api.TestStep;
 import cucumber.api.event.*;
 import cucumber.api.formatter.Formatter;
-import cucumber.runtime.StepDefinitionMatch;
 import gherkin.ast.Feature;
 import gherkin.ast.Step;
 import gherkin.ast.Tag;
@@ -705,6 +706,7 @@ public abstract class AbstractReporter implements Formatter {
 			LOGGER.error("BUG: Trying to finish unspecified test item.");
 			return;
 		}
+		//noinspection ReactiveStreamsUnusedPublisher
 		launch.get().finishTestItem(itemId, buildFinishTestItemRequest(itemId, dateTime, null));
 	}
 
@@ -744,6 +746,7 @@ public abstract class AbstractReporter implements Formatter {
 		}
 
 		FinishTestItemRQ rq = buildFinishTestItemRequest(itemId, null, mapItemStatus(status));
+		//noinspection ReactiveStreamsUnusedPublisher
 		launch.get().finishTestItem(itemId, rq);
 		return rq.getEndTime();
 	}
@@ -796,7 +799,7 @@ public abstract class AbstractReporter implements Formatter {
 
 		StringBuilder marg = new StringBuilder();
 		if (table != null) {
-			marg.append(formatDataTable(table));
+			marg.append(MarkdownUtils.formatDataTable(table));
 		}
 
 		if (docString != null) {
@@ -841,10 +844,10 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	@Nullable
 	protected Set<ItemAttributesRQ> getAttributes(@Nonnull TestStep testStep) {
-		Field definitionMatchField = getDefinitionMatchField(testStep);
-		if (definitionMatchField != null) {
+		Object definitionMatch = getDefinitionMatch(testStep);
+		if (definitionMatch != null) {
 			try {
-				Method method = retrieveMethod(definitionMatchField, testStep);
+				Method method = retrieveMethod(definitionMatch);
 				Attributes attributesAnnotation = method.getAnnotation(Attributes.class);
 				if (attributesAnnotation != null) {
 					return AttributeParser.retrieveAttributes(attributesAnnotation);
@@ -864,9 +867,8 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	@Nullable
 	protected String getCodeRef(@Nonnull TestStep testStep) {
-		return ofNullable(getDefinitionMatchField(testStep)).flatMap(match -> {
+		return ofNullable(getDefinitionMatch(testStep)).flatMap(stepDefinitionMatch -> {
 			try {
-				StepDefinitionMatch stepDefinitionMatch = (StepDefinitionMatch) match.get(testStep);
 				Field stepDefinitionField = stepDefinitionMatch.getClass().getDeclaredField(STEP_DEFINITION_FIELD_NAME);
 				stepDefinitionField.setAccessible(true);
 				Object javaStepDefinition = stepDefinitionField.get(stepDefinitionMatch);
@@ -908,10 +910,10 @@ public abstract class AbstractReporter implements Formatter {
 	@Nullable
 	@SuppressWarnings("unchecked")
 	protected TestCaseIdEntry getTestCaseId(@Nonnull TestStep testStep, @Nullable String codeRef) {
-		Field definitionMatchField = getDefinitionMatchField(testStep);
-		if (definitionMatchField != null) {
+		Object definitionMatch = getDefinitionMatch(testStep);
+		if (definitionMatch != null) {
 			try {
-				Method method = retrieveMethod(definitionMatchField, testStep);
+				Method method = retrieveMethod(definitionMatch);
 				return TestCaseIdUtils.getTestCaseId(method.getAnnotation(TestCaseId.class),
 						method,
 						codeRef,
@@ -954,7 +956,7 @@ public abstract class AbstractReporter implements Formatter {
 			if (arg instanceof PickleString) {
 				value = ((PickleString) arg).getContent();
 			} else if (arg instanceof PickleTable) {
-				value = formatDataTable(((PickleTable) arg).getRows()
+				value = MarkdownUtils.formatDataTable(((PickleTable) arg).getRows()
 						.stream()
 						.map(r -> r.getCells().stream().map(PickleCell::getValue).collect(Collectors.toList()))
 						.collect(Collectors.toList()));
@@ -1000,18 +1002,13 @@ public abstract class AbstractReporter implements Formatter {
 	 */
 	@Nonnull
 	protected Pair<String, String> getHookTypeAndName(@Nonnull HookType hookType) {
-		String name = null;
-		String type = null;
 		switch (hookType) {
 			case Before:
-				name = "Before hooks";
-				type = "BEFORE_TEST";
-				break;
+				return Pair.of(ItemType.BEFORE_TEST.name(), "Before hooks");
 			case After:
-				name = "After hooks";
-				type = "AFTER_TEST";
-				break;
+				return Pair.of(ItemType.AFTER_TEST.name(), "After hooks");
+			default:
+				return Pair.of(ItemType.TEST.name(), "Hook");
 		}
-		return Pair.of(type, name);
 	}
 }
