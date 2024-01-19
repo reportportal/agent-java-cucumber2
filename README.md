@@ -21,7 +21,7 @@ Add to POM.xml
 <dependency>
   <groupId>com.epam.reportportal</groupId>
   <artifactId>agent-java-cucumber2</artifactId>
-  <version>5.1.5</version>
+  <version>5.2.0</version>
 </dependency>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -37,7 +37,7 @@ but there are some differences in report structure.
 * **Scenario Reporter**
 * **Step Reporter**
 
-Step Reporter propagates the most traditional for ReportPortal test structure keeping your scenarios and steps inside 
+Step Reporter propagates the most traditional for ReportPortal test structure keeping your scenarios and steps inside
 as separate entities. In opposite, Scenario Reporter use scenario as the base point and does not separate step from each
 other which is sometimes more convenient for BDD users.
 
@@ -75,7 +75,7 @@ In order to start using of agent, user should configure property file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 rp.endpoint = https://rp.epam.com/
 rp.username = default
-rp.api.key = 8967de3b-fec7-47bb-9dbc-2aa4ceab8b1e
+rp.api.key = 5145b879-83d9-4692-8b07-928cc4b2af7a
 rp.launch = default_TEST_EXAMPLE
 rp.project = default_project
 
@@ -92,7 +92,7 @@ User should provide next parameters to agent.
 | **Parameter**        | **Description**                                                                                                                                                                                                                                                                                                                                | **Required** |
 |----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
 | rp.enable            | Enable/Disable logging to ReportPortal: rp.enable=true - enable log to RP server.  Any other value means 'false': rp.enable=false - disable log to RP server.  If parameter is skipped in properties file then automation project results will be posted on RP.                                                                                | No           |
-| rp.uuid              | API key of the user.                                                                                                                                                                                                                                                                                                                           | Yes          |
+| rp.api.key           | API key of the user.                                                                                                                                                                                                                                                                                                                           | Yes          |
 | rp.endpoint          | URL of web service, where requests should be sent                                                                                                                                                                                                                                                                                              | Yes          |
 | rp.launch            | The unique name of Launch (Run), based on that name a history of runs will be created for the particular name                                                                                                                                                                                                                                  | Yes          |
 | rp.project           | Project name, to identify scope                                                                                                                                                                                                                                                                                                                | Yes          |
