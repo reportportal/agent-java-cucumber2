@@ -27,6 +27,7 @@ import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.service.tree.TestItemTree;
 import com.epam.reportportal.utils.*;
 import com.epam.reportportal.utils.files.ByteSource;
+import com.epam.reportportal.utils.http.ContentType;
 import com.epam.reportportal.utils.markdown.MarkdownUtils;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
@@ -46,8 +47,6 @@ import gherkin.ast.Step;
 import gherkin.ast.Tag;
 import gherkin.pickles.*;
 import io.reactivex.Maybe;
-import okhttp3.MediaType;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -548,15 +547,7 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param data     data to attach
 	 */
 	protected void embedding(String mimeType, byte[] data) {
-		String type = ofNullable(mimeType).filter(m -> {
-			try {
-				MediaType.get(m);
-				return true;
-			} catch (IllegalArgumentException e) {
-				LOGGER.warn("Incorrect media type '{}'", m);
-				return false;
-			}
-		}).orElseGet(() -> getDataType(data));
+		String type = ofNullable(mimeType).filter(ContentType::isValidType).orElseGet(() -> getDataType(data));
 		String attachmentName = ofNullable(type).map(t -> t.substring(0, t.indexOf("/"))).orElse("");
 		ReportPortal.emitLog(new ReportPortalMessage(ByteSource.wrap(data), type, attachmentName),
 				"UNKNOWN",
