@@ -1,4 +1,5 @@
 # Cucumber2 Agent for ReportPortal
+> **End of support**: The agent lifecycle already ended. You are free to use it as long as you prefer, but no new updates will be published.
 
 > **DISCLAIMER**: We use Google Analytics for sending anonymous usage information such as agent's and client's names,
 > and their versions after a successful launch start. This information might help us to improve both ReportPortal
