@@ -1,10 +1,10 @@
 # Changelog
-### Changed
-- Client version updated on [5.2.21](https://github.com/reportportal/client-java/releases/tag/5.2.21), by @HardNorth
 
 ## [Unreleased]
+### Added
+- Common Stack Trace frames skip in logs, by @HardNorth
 ### Changed
-- Client version updated on [5.2.14](https://github.com/reportportal/client-java/releases/tag/5.2.14), by @HardNorth
+- Client version updated on [5.2.21](https://github.com/reportportal/client-java/releases/tag/5.2.21), by @HardNorth
 
 ## [5.2.2]
 ### Changed
