@@ -27,8 +27,8 @@ import com.epam.reportportal.service.item.TestCaseIdEntry;
 import com.epam.reportportal.service.tree.TestItemTree;
 import com.epam.reportportal.utils.*;
 import com.epam.reportportal.utils.files.ByteSource;
+import com.epam.reportportal.utils.formatting.MarkdownUtils;
 import com.epam.reportportal.utils.http.ContentType;
-import com.epam.reportportal.utils.markdown.MarkdownUtils;
 import com.epam.reportportal.utils.properties.SystemAttributesExtractor;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
@@ -68,10 +68,10 @@ import static com.epam.reportportal.cucumber.Utils.*;
 import static com.epam.reportportal.cucumber.util.ItemTreeUtils.createKey;
 import static com.epam.reportportal.cucumber.util.ItemTreeUtils.retrieveLeaf;
 import static java.lang.String.format;
+import static com.epam.reportportal.utils.formatting.ExceptionUtils.getStackTrace;
 import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
-import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
 /**
  * Abstract Cucumber 2.x formatter for Report Portal
@@ -325,7 +325,8 @@ public abstract class AbstractReporter implements Formatter {
 	 * @param scenarioContext current scenario context
 	 */
 	protected void beforeScenario(RunningContext.FeatureContext featureContext, RunningContext.ScenarioContext scenarioContext) {
-		String scenarioName = Utils.buildName(scenarioContext.getKeyword(),
+		String scenarioName = Utils.buildName(
+				scenarioContext.getKeyword(),
 				AbstractReporter.COLON_INFIX,
 				scenarioContext.getTestCase().getName()
 		);
@@ -398,7 +399,8 @@ public abstract class AbstractReporter implements Formatter {
 	}
 
 	private void addToTree(RunningContext.ScenarioContext scenarioContext, String text, Maybe<String> stepId) {
-		retrieveLeaf(scenarioContext.getFeatureUri(),
+		retrieveLeaf(
+				scenarioContext.getFeatureUri(),
 				scenarioContext.getLine(),
 				ITEM_TREE
 		).ifPresent(scenarioLeaf -> scenarioLeaf.getChildItems().put(createKey(text), TestItemTree.createTestItemLeaf(stepId)));
@@ -460,8 +462,8 @@ public abstract class AbstractReporter implements Formatter {
 	/**
 	 * Start before/after-hook item on Report Portal
 	 *
-	 * @param parentId  parent item id
-	 * @param rq hook start request
+	 * @param parentId parent item id
+	 * @param rq       hook start request
 	 * @return hook item id
 	 */
 	@Nonnull
@@ -538,7 +540,7 @@ public abstract class AbstractReporter implements Formatter {
 		if (errorMessage != null) {
 			sendLog(errorMessage, level);
 		} else if (result.getError() != null) {
-			sendLog(getStackTrace(result.getError()), level);
+			sendLog(getStackTrace(result.getError(), new Throwable()), level);
 		}
 	}
 
@@ -561,7 +563,8 @@ public abstract class AbstractReporter implements Formatter {
 	protected void embedding(String mimeType, byte[] data) {
 		String type = ofNullable(mimeType).filter(ContentType::isValidType).orElseGet(() -> getDataType(data));
 		String attachmentName = ofNullable(type).map(t -> t.substring(0, t.indexOf("/"))).orElse("");
-		ReportPortal.emitLog(new ReportPortalMessage(ByteSource.wrap(data), type, attachmentName),
+		ReportPortal.emitLog(
+				new ReportPortalMessage(ByteSource.wrap(data), type, attachmentName),
 				"UNKNOWN",
 				Calendar.getInstance().getTime()
 		);
@@ -649,14 +652,16 @@ public abstract class AbstractReporter implements Formatter {
 		TestCase testCase = event.testCase;
 		RunningContext.FeatureContext newFeatureContext = new RunningContext.FeatureContext(testCase);
 		String featureUri = newFeatureContext.getUri();
-		RunningContext.FeatureContext featureContext = currentFeatureContextMap.computeIfAbsent(featureUri, u -> {
-			getRootItemId(); // trigger root item creation
-			newFeatureContext.setFeatureId(startFeature(buildStartFeatureRequest(newFeatureContext.getFeature(), featureUri)));
-			if (launch.get().getParameters().isCallbackReportingEnabled()) {
-				addToTree(newFeatureContext);
-			}
-			return newFeatureContext;
-		});
+		RunningContext.FeatureContext featureContext = currentFeatureContextMap.computeIfAbsent(
+				featureUri, u -> {
+					getRootItemId(); // trigger root item creation
+					newFeatureContext.setFeatureId(startFeature(buildStartFeatureRequest(newFeatureContext.getFeature(), featureUri)));
+					if (launch.get().getParameters().isCallbackReportingEnabled()) {
+						addToTree(newFeatureContext);
+					}
+					return newFeatureContext;
+				}
+		);
 
 		if (!featureContext.getUri().equals(testCase.getUri())) {
 			throw new IllegalStateException("Scenario URI does not match Feature URI.");
@@ -664,10 +669,12 @@ public abstract class AbstractReporter implements Formatter {
 
 		RunningContext.ScenarioContext newScenarioContext = featureContext.getScenarioContext(testCase);
 		Pair<Integer, String> scenarioLineFeatureURI = Pair.of(newScenarioContext.getLine(), featureContext.getUri());
-		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.computeIfAbsent(scenarioLineFeatureURI, k -> {
-			currentScenarioContext.set(newScenarioContext);
-			return newScenarioContext;
-		});
+		RunningContext.ScenarioContext scenarioContext = currentScenarioContextMap.computeIfAbsent(
+				scenarioLineFeatureURI, k -> {
+					currentScenarioContext.set(newScenarioContext);
+					return newScenarioContext;
+				}
+		);
 
 		beforeScenario(featureContext, scenarioContext);
 	}
@@ -762,7 +769,8 @@ public abstract class AbstractReporter implements Formatter {
 			return null;
 		} else {
 			if (STATUS_MAPPING.get(status) == null) {
-				LOGGER.error(String.format("Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
+				LOGGER.error(String.format(
+						"Unable to find direct mapping between Cucumber and ReportPortal for TestItem with status: '%s'.",
 						status
 				));
 				return ItemStatus.SKIPPED;
@@ -955,7 +963,8 @@ public abstract class AbstractReporter implements Formatter {
 		if (definitionMatch != null) {
 			try {
 				Method method = retrieveMethod(definitionMatch);
-				return TestCaseIdUtils.getTestCaseId(method.getAnnotation(TestCaseId.class),
+				return TestCaseIdUtils.getTestCaseId(
+						method.getAnnotation(TestCaseId.class),
 						method,
 						codeRef,
 						(List<Object>) ARGUMENTS_TRANSFORM.apply(testStep.getDefinitionArgument())
