@@ -23,13 +23,11 @@ import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.service.ReportPortalClient;
 import com.epam.reportportal.util.test.CommonUtils;
-import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import cucumber.api.CucumberOptions;
 import cucumber.api.testng.AbstractTestNGCucumberTests;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -46,14 +44,14 @@ public class DuplicateStepTest {
 	@CucumberOptions(features = "src/test/resources/features/DuplicateStep.feature", glue = {
 			"com.epam.reportportal.cucumber.integration.duplicate" }, plugin = { "pretty",
 			"com.epam.reportportal.cucumber.integration.TestStepReporter" })
-	public static class DuplicateStepReporter extends AbstractTestNGCucumberTests {
+	public static class DuplicateStepReporterTest extends AbstractTestNGCucumberTests {
 
 	}
 
 	@CucumberOptions(features = "src/test/resources/features/DuplicateStep.feature", glue = {
 			"com.epam.reportportal.cucumber.integration.duplicate" }, plugin = { "pretty",
 			"com.epam.reportportal.cucumber.integration.TestScenarioReporter" })
-	public static class DuplicateScenarioReporter extends AbstractTestNGCucumberTests {
+	public static class DuplicateScenarioReporterTest extends AbstractTestNGCucumberTests {
 
 	}
 
@@ -79,7 +77,7 @@ public class DuplicateStepTest {
 
 	@Test
 	public void verify_duplicate_step_scenario_reporter() {
-		TestUtils.runTests(DuplicateScenarioReporter.class);
+		TestUtils.runTests(DuplicateScenarioReporterTest.class);
 
 		verify(client, times(0)).startLaunch(any());
 		verify(client, times(0)).startTestItem(any());
@@ -90,7 +88,7 @@ public class DuplicateStepTest {
 
 	@Test
 	public void verify_duplicate_step_step_reporter() {
-		TestUtils.runTests(DuplicateStepReporter.class);
+		TestUtils.runTests(DuplicateStepReporterTest.class);
 
 		verify(client, times(0)).startLaunch(any());
 		verify(client, times(0)).startTestItem(any());
